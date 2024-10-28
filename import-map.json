@@ -1,0 +1,5 @@
+{
+    "imports": {
+        "game-framework/": "./assets/game-framework/"
+    }
+}

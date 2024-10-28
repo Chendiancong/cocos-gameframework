@@ -1,0 +1,124 @@
+[
+  {
+    "__type__": "cc.Prefab",
+    "_name": "AngerBar",
+    "_objFlags": 0,
+    "__editorExtras__": {},
+    "_native": "",
+    "data": {
+      "__id__": 1
+    },
+    "optimizationPolicy": 0,
+    "persistent": false
+  },
+  {
+    "__type__": "cc.Node",
+    "_name": "AngerBar",
+    "_objFlags": 0,
+    "__editorExtras__": {},
+    "_parent": null,
+    "_children": [],
+    "_active": true,
+    "_components": [
+      {
+        "__id__": 2
+      }
+    ],
+    "_prefab": {
+      "__id__": 6
+    },
+    "_lpos": {
+      "__type__": "cc.Vec3",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "_lrot": {
+      "__type__": "cc.Quat",
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "w": 1
+    },
+    "_lscale": {
+      "__type__": "cc.Vec3",
+      "x": 0.1,
+      "y": 0.1,
+      "z": 0.1
+    },
+    "_mobility": 0,
+    "_layer": 4,
+    "_euler": {
+      "__type__": "cc.Vec3",
+      "x": 0,
+      "y": 0,
+      "z": 0
+    },
+    "_id": ""
+  },
+  {
+    "__type__": "342e7YVPYxPMLZnd0pvjhXn",
+    "_name": "",
+    "_objFlags": 0,
+    "__editorExtras__": {},
+    "node": {
+      "__id__": 1
+    },
+    "_enabled": true,
+    "__prefab": {
+      "__id__": 3
+    },
+    "hpMaterial": {
+      "__uuid__": "de31827d-3a5a-4868-ab63-d50d1b3dc133",
+      "__expectedType__": "cc.Material"
+    },
+    "frontInfo": {
+      "__id__": 4
+    },
+    "backgroundInfo": {
+      "__id__": 5
+    },
+    "useGpuInstance": true,
+    "_id": ""
+  },
+  {
+    "__type__": "cc.CompPrefabInfo",
+    "fileId": "ffUZmIYqlDgYRn8iy0KAgl"
+  },
+  {
+    "__type__": "HpBar3d.ProgressSize",
+    "width": 12,
+    "height": 1,
+    "color": {
+      "__type__": "cc.Color",
+      "r": 242,
+      "g": 193,
+      "b": 88,
+      "a": 255
+    }
+  },
+  {
+    "__type__": "HpBar3d.ProgressSize",
+    "width": 12.2,
+    "height": 1.2,
+    "color": {
+      "__type__": "cc.Color",
+      "r": 0,
+      "g": 0,
+      "b": 0,
+      "a": 204
+    }
+  },
+  {
+    "__type__": "cc.PrefabInfo",
+    "root": {
+      "__id__": 1
+    },
+    "asset": {
+      "__id__": 0
+    },
+    "fileId": "c46/YsCPVOJYA4mWEpNYRx",
+    "instance": null,
+    "targetOverrides": null
+  }
+]

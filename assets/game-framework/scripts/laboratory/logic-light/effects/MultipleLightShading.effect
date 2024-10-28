@@ -1,0 +1,425 @@
+// Effect Syntax Guide: https://docs.cocos.com/creator/manual/zh/shader/index.html
+
+CCEffect %{
+  techniques:
+  - name: opaque
+    embeddedMacros: { MULTIPLE_LIGHTING: false }
+    passes:
+    - &forward-base
+      vert: stylize-scene-object-vs
+      frag: stylize-scene-object-fs
+      properties: &forward-base-props
+        tilingOffset:   { value: [1.0, 1.0, 0.0, 0.0] }
+        mainTexture:    { value: grey, target: albedoMap, editor: { displayName: AlbedoMap } }
+        mainColor:      { value: [1, 1, 1, 1], target: albedo, linear: true, editor: { displayName: Albedo, type: color } }
+        emissive:       { value: [0.0, 0.0, 0.0, 1.0], linear: true, editor: { type: color } }
+        emissiveScale:  { value: [0.0, 0.0, 0.0, 1.0] }
+    - &forward-add
+      vert: stylize-scene-object-vs
+      frag: stylize-scene-object-fs
+      phase: forward-add
+      propertyIndex: 0
+      embeddedMacros: { CC_FORWARD_ADD: true }
+      depthStencilState:
+        depthFunc: equal
+        depthTest: true
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendSrc: one
+          blendDst: one
+          blendSrcAlpha: zero
+          blendDstAlpha: one
+    - &shadow-caster
+      vert: shadow-caster-vs:vert
+      frag: shadow-caster-fs:frag
+      phase: shadow-caster
+      propertyIndex: 0
+      rasterizerState:
+        cullMode: front
+      properties: *forward-base-props
+  - name: opaque-multi-light
+    passes:
+    - vert: stylize-scene-object-vs
+      frag: stylize-scene-object-fs
+      properties: *forward-base-props
+}%
+
+CCProgram shared-ubos %{
+    uniform Constants {
+        vec4 tilingOffset;
+        vec4 albedo;
+        vec4 emissive;
+        vec4 emissiveScale;
+    };
+}%
+
+CCProgram surface-structure %{
+    struct Surface {
+        vec4 albedo;
+        HIGHP_VALUE_STRUCT_DEFINE(vec3, position);
+        vec3 normal;
+        #if CC_RECEIVE_SHADOW
+            vec2 shadowBias;
+        #endif
+    };
+}%
+
+CCProgram light-shading %{
+    #include <legacy/shading-standard-base>
+    #define kMETALLIC 0.6
+    #define kROUGHNESS 0.8
+    #define kSPECULARINTENSITY 0.5
+    #if CC_FORWARD_ADD
+        #include <legacy/lighting>
+    #endif
+    #if MULTIPLE_LIGHTING && !CC_FORWARD_ADD
+        float SmoothDistAtt(float distSqr, float invSqrAttRadius) {
+            float factor = distSqr * invSqrAttRadius;
+            float smoothFactor = clamp(1.0 - factor * factor, 0.0, 1.0);
+            return smoothFactor * smoothFactor;
+        }
+
+        float GetDistAtt(float distSqr, float invSqrAttRadius) {
+            float attenuation = 1.0 / max(distSqr, 0.01 * 0.01);
+            attenuation *= SmoothDistAtt(distSqr, invSqrAttRadius);
+            return attenuation;
+        }
+
+        float GetAngleAtt(vec3 L, vec3 litDir, float litAngleScale, float litAngleOffset) {
+            float cd = dot(litDir, L);
+            float attenuation = clamp(cd * litAngleScale + litAngleOffset, 0.0, 1.0);
+            return (attenuation * attenuation);
+        }
+
+        layout (set = 1, binding = 1) uniform AdditiveLight {
+            highp vec4 additiveLightPos[4];
+            vec4 additiveLightColor[4];
+            vec4 additiveLightSizeRangeAngle[4];
+            vec4 additiveLightDir[4];
+            int realityLightNum;
+        };
+    #endif
+
+    vec4 shading(Surface s, vec4 shadowPos) {
+        vec3 position;
+        HIGHP_VALUE_FROM_STRUCT_DEFINED(position, s.position);
+
+        vec3 diffuse = s.albedo.rgb * (1.0 - kMETALLIC);
+        vec3 specular = mix(vec3(0.08 * kSPECULARINTENSITY), s.albedo.rgb, kMETALLIC);
+        vec3 diffuseContrib = diffuse / PI;
+
+        vec3 N = normalize(s.normal);
+        vec3 V = normalize(cc_cameraPos.xyz - position);
+        float NV = max(abs(dot(N, V)), 0.0);
+        specular = BRDFApprox(specular, kROUGHNESS, NV);
+
+        vec3 finalColor = vec3(0.0);
+        float colorAlpha = 0.0;
+
+        #if !CC_FORWARD_ADD && (CC_PIPELINE_TYPE == CC_PIPELINE_TYPE_FORWARD || CC_FORCE_FORWARD_SHADING)
+            colorAlpha = s.albedo.a;
+            vec3 L = normalize(-cc_mainLitDir.xyz);
+            vec3 H = normalize(L + V);
+            float NH = max(dot(N, H), 0.0);
+            float NL = max(dot(N, L), 0.0);
+            finalColor += NL * cc_mainLitColor.rgb * cc_mainLitColor.w;
+
+            vec3 specularContrib = specular * CalcSpecular(kROUGHNESS, NH, H, N);
+            vec3 dirlightContrib = (diffuseContrib+specularContrib);
+
+            float shadow = 1.0;
+            #if CC_RECEIVE_SHADOW
+                if (NL > 0.0 && cc_mainLitDir.w > 0.0) {
+                    shadow = CCShadowFactorBase(shadowPos, N, s.shadowBias);
+                }
+            #endif
+
+            dirlightContrib *= shadow;
+            finalColor *= dirlightContrib;
+
+            float fAmb = 0.5 - N.y * 0.5;
+            vec3 ambDiff = mix(cc_ambientSky.rgb, cc_ambientGround.rgb, fAmb);
+
+            finalColor += ambDiff.rgb * cc_ambientSky.w * diffuse;
+
+            #if CC_USE_IBL
+                vec3 R = normalize(reflect(-V, N));
+
+                #if USE_REFLECTION_DENOISE
+                    vec3 env = GetEnvReflectionWithMipFiltering(R, kROUGHNESS, cc_ambientGround.w, 0.6);
+                #else
+                    vec4 envmap = fragTextureLod(cc_environment, R, kROUGHNESS * cc_ambientGround.w);
+                    #if CC_USE_IBL == IBL_RGBE
+                        vec3 env = unpackRGBE(envmap);
+                    #else
+                        vec3 env = SRGBToLinear(envmap.rgb);
+                    #endif
+                #endif
+
+                finalColor += env * cc_ambientSky.w * specular;
+            #endif
+
+            #if ENABLE_EMISSIVE
+                vec3 emissiveColor = emissiveScale.rgb * emissive.rgb;
+                finalColor += emissiveColor;
+            #endif
+        #endif
+
+        #if CC_FORWARD_ADD || MULTIPLE_LIGHTING
+            #if CC_FORWARD_ADD
+                #define LIGHT_POS cc_lightPos
+                #define LIGHT_COLOR cc_lightColor
+                #define LIGHT_SIZE_RANGE_ANGLE cc_lightSizeRangeAngle
+                #define LIGHT_DIR cc_lightDir
+                #define PASS_NUM LIGHTS_PER_PASS
+
+                int numLights = CC_PIPELINE_TYPE == CC_PIPELINE_TYPE_FORWARD ? LIGHTS_PER_PASS : int(cc_lightDir[0].w);
+            #else
+
+                #define LIGHT_POS additiveLightPos
+                #define LIGHT_COLOR additiveLightColor
+                #define LIGHT_SIZE_RANGE_ANGLE additiveLightSizeRangeAngle
+                #define LIGHT_DIR additiveLightDir
+                #define PASS_NUM 4
+
+                int numLights = realityLightNum;
+            #endif
+
+            for (int i = 0; i < PASS_NUM; i++) {
+                if (i >= numLights) break;
+                vec3 SLU = LIGHT_POS[i].xyz - position;
+                vec3 SL = normalize(SLU);
+                vec3 SH = normalize(SL + V);
+                float SNL = max(dot(N, SL), 0.0);
+                float SNH = max(dot(N, SH), 0.0);
+
+                float distSqr = dot(SLU, SLU);
+                float litRadius = LIGHT_SIZE_RANGE_ANGLE[i].x;
+                float litRadiusSqr = litRadius * litRadius;
+                float illum = litRadiusSqr / max(litRadiusSqr, distSqr);
+                float attRadiusSqrInv = 1.0 / max(LIGHT_SIZE_RANGE_ANGLE[i].y, 0.01);
+                attRadiusSqrInv *= attRadiusSqrInv;
+                float att = GetDistAtt(distSqr, attRadiusSqrInv);
+                vec3 lspec = specular * CalcSpecular(kROUGHNESS, SNH, SH, N);
+
+                if (LIGHT_POS[i].w > 0.0) {
+                    float cosInner = max(dot(LIGHT_DIR[i].xyz, SL), 0.01);
+                    float cosOuter = LIGHT_SIZE_RANGE_ANGLE[i].z;
+                    float litAngleScale = 1.0 / max(0.001, cosInner - cosOuter);
+                    float litAngleOffset = -cosOuter * litAngleScale;
+                    att *= GetAngleAtt(SL, LIGHT_DIR[i].xyz, litAngleScale, litAngleOffset);
+                }
+
+                vec3 lightColor = LIGHT_COLOR[i].rgb;
+
+                float shadow = 1.0;
+                #if CC_RECEIVE_SHADOW
+                    if (LIGHT_POS[i].w > 0.0 && LIGHT_SIZE_RANGE_ANGLE[i].w > 0.0) {
+                        shadow = CCSpotShadowFactorBase(shadowPos, position, s.shadowBias);
+                    }
+                #endif
+
+                lightColor *= shadow;
+                finalColor += SNL * lightColor * LIGHT_COLOR[i].a * illum * att * (diffuseContrib + lspec);
+            }
+        #endif
+
+        return vec4(finalColor, colorAlpha);
+    }
+}%
+
+CCProgram stylize-scene-object-vs %{
+    precision highp float;
+    #include <legacy/input-standard>
+    #include <builtin/uniforms/cc-global>
+    #include <legacy/decode-base>
+    #include <legacy/local-batch>
+    #include <shared-ubos>
+    #include <legacy/fog-vs>
+    #include <legacy/shadow-map-vs>
+    #include <../chunks/lighting-define>
+
+    out vec3 v_position;
+    out mediump vec3 v_normal;
+    out vec2 v_uv;
+    #if HAS_SECOND_UV
+        out mediump vec2 v_uv1;
+    #endif
+
+    #if HAS_SECOND_UV || CC_USE_LIGHTMAP
+        in vec2 a_texCoord1;
+    #endif
+
+    #if CC_RECEIVE_SHADOW
+        out mediump vec2 v_shadowBias;
+    #endif
+
+    void main() {
+        StandardVertInput In;
+        CCVertInput(In);
+
+        mat4 matWorld, matWorldIT;
+        CCGetWorldMatrixFull(matWorld, matWorldIT);
+
+        vec4 pos = matWorld * In.position;
+
+        v_position = pos.xyz;
+        v_normal = normalize((matWorldIT * vec4(In.normal, 0.0)).xyz);
+
+        #if CC_RECEIVE_SHADOW
+            v_shadowBias = CCGetShadowBias();
+        #endif
+
+        v_uv = a_texCoord * tilingOffset.xy + tilingOffset.zw;
+
+        #if HAS_SECOND_UV
+            v_uv1 = a_texCoord1 * tilingOffset.xy + tilingOffset.zw;
+        #endif
+
+        CC_TRANSFER_FOG(pos);
+        CC_TRANSFER_SHADOW(pos);
+
+        gl_Position = cc_matProj * (cc_matView * matWorld) * In.position;
+    }
+}%
+
+CCProgram stylize-scene-object-fs %{
+    precision highp float;
+    #include <builtin/uniforms/cc-global>
+    #include <shared-ubos>
+    #include <legacy/fog-fs>
+    #include <legacy/output-standard>
+    #include <legacy/shadow-map-fs>
+    #include <surface-structure>
+    #include <light-shading>
+
+    in vec3 v_position;
+    in vec2 v_uv;
+    #if HAS_SECOND_UV
+        in mediump vec2 v_uv1;
+    #endif
+    in mediump vec3 v_normal;
+
+    #if CC_RECEIVE_SHADOW
+        in mediump vec2 v_shadowBias;
+    #endif
+
+    #if USE_ALBEDO_MAP
+        uniform sampler2D albedoMap;
+        #pragma define-meta ALBEDO_UV options([v_uv, v_uv1])
+    #endif
+
+    layout(location = 0) out vec4 fragColorX;
+
+    void surf(out Surface s) {
+        vec4 baseColor = albedo;
+        s.albedo = baseColor;
+        #if USE_ALBEDO_MAP
+            vec4 texColor = texture(albedoMap, ALBEDO_UV);
+            texColor.rgb = SRGBToLinear(texColor.rgb);
+            baseColor *= texColor;
+        #endif
+
+        s.normal = v_normal;
+
+        #if CC_RECEIVE_SHADOW
+            s.shadowBias = v_shadowBias;
+        #endif
+
+        HIGHP_VALUE_TO_STRUCT_DEFINED(v_position, s.position);
+    }
+
+    void main() {
+        Surface s;
+        surf(s);
+        vec4 color = shading(s, CC_SHADOW_POSITION);
+        CC_APPLY_FOG(color, s.position.xyz);
+        fragColorX = CCFragOutput(color);
+    }
+}%
+
+CCProgram shadow-caster-vs %{
+    precision highp float;
+    #include <legacy/input-standard>
+    #include <legacy/decode-base>
+    #include <legacy/local-batch>
+    #include <shared-ubos>
+    #include <builtin/uniforms/cc-shadow>
+#if CC_SUPPORT_CASCADED_SHADOW_MAP
+  #include <builtin/uniforms/cc-csm>
+#endif
+
+    #if HAS_SECOND_UV
+        in vec2 a_texCoord1;
+    #endif
+
+    out vec2 v_uv;
+    #if HAS_SECOND_UV
+        out vec2 v_uv1;
+    #endif
+    out vec4 v_worldPos;
+    out float v_clip_depth;
+
+    vec4 vert() {
+        StandardVertInput In;
+        CCVertInput(In);
+
+        mat4 matWorld, matWorldIT;
+        CCGetWorldMatrixFull(matWorld, matWorldIT);
+
+        v_worldPos = matWorld * In.position;
+        vec4 clipPos = cc_matLightViewProj * v_worldPos;
+
+        v_uv = a_texCoord * tilingOffset.xy + tilingOffset.zw;
+        #if HAS_SECOND_UV
+            v_uv1 = a_texCoord1 * tilingOffset.xy + tilingOffset.zw;
+        #endif
+
+        v_clip_depth = clipPos.z / clipPos.w * 0.5 + 0.5;
+
+        return clipPos;
+    }
+}%
+
+CCProgram shadow-caster-fs %{
+    precision highp float;
+    #include <shared-ubos>
+    #include <common/data/packing>
+    #include <legacy/shadow-map-base>
+
+    in vec2 v_uv;
+    #if HAS_SECOND_UV
+        in vec2 v_uv1;
+    #endif
+    in vec4 v_worldPos;
+    in float v_clip_depth;
+
+    #if USE_ALBEDO_MAP
+        uniform sampler2D albedoMap;
+        #pragma define-meta ALBEDO_UV options([v_uv, v_vu1])
+    #endif
+
+    vec4 frag() {
+        vec4 baseColor = albedo;
+
+        #if USE_ALBEDO_MAP
+            baseColor *= texture(albedoMap, ALBEDO_UV);
+        #endif
+
+        // spot use linear
+        if (cc_shadowLPNNInfo.x > 0.000001 && cc_shadowLPNNInfo.x < 1.999999) {
+            //enable linear depth
+            if (cc_shadowNFLSInfo.z > 0.000001) {
+                return vec4(CCGetLinearDepth(v_worldPos.xyz), 1.0, 1.0, 1.0);
+            }
+        }
+
+        if (cc_shadowLPNNInfo.y > 0.000001) {
+            return packDepthToRGBA(v_clip_depth);
+        }
+
+        return vec4(v_clip_depth, 1.0, 1.0, 1.0);
+    }
+}%

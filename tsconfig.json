@@ -4,6 +4,11 @@
 
   /* Add your custom configuration here. */
   "compilerOptions": {
-    "strict": false
+    "strict": false,
+    "target": "ES2016",
+    "module": "ES6",
+    "paths": {
+      "game-framework/*": ["./assets/game-framework/*"]
+    }
   }
 }
