@@ -103,7 +103,7 @@ declare namespace gFramework {
     export const layerMgr: import("../game-framework/scripts/view/LayerMgr").LayerMgr;
     export const viewMgr: import("../game-framework/scripts/view/ViewMgr").ViewMgr;
     export const systemMgr: typeof import("../game-framework/scripts/base/SystemMgr").systemMgr;
-    export const net: typeof import("../game-framework/scripts/net/GameNet");
+    export const net: typeof import('../game-framework/scripts/net/GameNet').netIns;
     export const timerCenter: import("../game-framework/scripts/timer/PriorityTimer").PriorityTimer;
     export const localStorage: IStorage;
     export const globalEvent: import("cc").EventTarget;
@@ -233,6 +233,11 @@ declare namespace gFramework {
         onTargetPause(target: T): void;
         onTargetWillStop(target: T): void;
         onTargetStop(target: T): void;
+    }
+
+    interface INetworkHook {
+        onRelogin?(success: Function, failure: Function);
+        onReconnect?(success: Function, failure: Function);
     }
 }
 

@@ -1,19 +1,21 @@
 import { CustomEvent } from "../events/Event";;
-import { bufferPool, NetworkHandler } from "./NetWorkHandler";
+import { bufferPool, Network } from "./Network";
 import { ByteArray } from "./ByteArray";
-import { EventTarget, director, game, Scheduler, ISchedulable, Game, macro, gfx } from "cc";
+import { EventTarget, director, game, Scheduler, ISchedulable, Game, macro } from "cc";
 import { DEBUG } from "cc/env";
 import { debugUtil } from "../base/debugUtil";
 import { getUuid } from "../base/uuid";
 import { trycatch } from "../base/jsUtil";
 import { EnumGameAppState } from "../datas/GameAppState";
-import { ExecuteGMResult, SocketCallResult } from "../base/GameInstance";
+import { SocketCallResult } from "../base/GameInstance";
 
-type ProtoData<T> = Partial<Omit<WithoutType<T, Function>, 'cmd'>>;
+type ProtoData<T> = Partial<WithoutType<T, Function>>;
 
 export type ReturnOfNetCall = ReturnType<GameNet['call']>&ReturnType<GameNet['send']>;
 
 type InnerSocketData = { cmd: number, seq: number, buf: ByteArray };
+
+type NEventType = 'connect'|'ioError'|'close'|'errorCode'|'netHeartBlock'|'connectionLost'|'connectReestablished';
 
 export type SocketData = Omit<InnerSocketData, 'buf'> & { protocol: string };
 
@@ -41,8 +43,17 @@ export interface INetPendingCallback {
 }
 
 export let NET_DEBUG = DEBUG;
+
+export const enum SaveACallRet {
+    Success,
+    Failure
+}
+
 //Protocol
 let innerP: any;
+let _c2sFilters = {};
+let _s2cFilters = {};
+let hook: gFramework.INetworkHook;
 
 export class GameNet extends EventTarget implements ISchedulable {
     private _cmd2Protocol: { [cmd: number]: string } = {};
@@ -56,7 +67,7 @@ export class GameNet extends EventTarget implements ISchedulable {
 
     public c2sLogFilters: { [cmd: number]: true } = {};
     public s2cLogFilters: { [cmd: number]: true } = {};
-    public network: NetworkHandler;
+    public network: Network;
     public id?: string;
     public uuid?: string;
 
@@ -79,7 +90,7 @@ export class GameNet extends EventTarget implements ISchedulable {
         this.uuid = getUuid();
         Scheduler.enableForTarget(this);
         this._initCmd2Protocol();
-        let ins = this.network = new NetworkHandler();
+        let ins = this.network = new Network();
         ins.on("onSocketData", this._onSocketData, this);
         ins.on("connect", this._connetedFun, this);
         ins.on("ioError", function (errorEvt) {
@@ -275,7 +286,7 @@ export class GameNet extends EventTarget implements ISchedulable {
             delete this._timeoutCallBacks[seq];
             delete this._pendingCallbacks[seq];
             if (pending.failure) {
-                debugUtil.log(`seq: ${seq} TimeOut ` + Net.getServerTimeSec());
+                debugUtil.log(`seq: ${seq} TimeOut ` + netIns.getServerTimeSec());
             }
         }
         if (this._keepAliveRecord.length) {
@@ -435,20 +446,16 @@ export class GameNet extends EventTarget implements ISchedulable {
     /** 重连 */
     private _reConnetFun() {
         if (this._noMoreConnected || this._reConnecting) return;
-        if (this.reconnect) {
-            this._reConnecting = true;
-            this._keepAlive();
-            this.reconnect(() => {
-                this._hideWaitLayer();
-                this._tryConnectCnt = 0;
-                this._reConnecting = false;
-            }, () => {
-                this._showWaitLayer("reConnet fail");
-                this._reConnecting = false;
-            });
-        } else {
+        this._reConnecting = true;
+        this._keepAlive();
+        this.reconnect(() => {
             this._hideWaitLayer();
-        }
+            this._tryConnectCnt = 0;
+            this._reConnecting = false;
+        }, () => {
+            this._showWaitLayer("reConnet fail");
+            this._reConnecting = false;
+        });
     }
 
     /** 重登 */
@@ -456,20 +463,18 @@ export class GameNet extends EventTarget implements ISchedulable {
         debugUtil.log("*****doRelogin~~！");
         this.emit("connectReestablished", true);
         this._removeSilentConnectTimer();
-        if (this.relogin) {
-            this._reConnecting = true;
-            this._keepAlive();
-            this.relogin(() => {
-                debugUtil.log("relogin success");
-                this._hideWaitLayer();
-                this._reConnecting = false;
-            }, () => {
-                debugUtil.log("relogin fail");
-                this._hideWaitLayer();
-                this._reConnecting = false;
-                this.emit("connectionLost");
-            });
-        }
+        this._reConnecting = true;
+        this._keepAlive();
+        this.relogin(() => {
+            debugUtil.log("relogin success");
+            this._hideWaitLayer();
+            this._reConnecting = false;
+        }, () => {
+            debugUtil.log("relogin fail");
+            this._hideWaitLayer();
+            this._reConnecting = false;
+            this.emit("connectionLost");
+        });
     }
 
     private _removeSilentConnectTimer() {
@@ -481,7 +486,7 @@ export class GameNet extends EventTarget implements ISchedulable {
 
     private _showWaitLayer(reason: string) {
         gFramework.globalEvent.emit("openNetLostWaitUI", true, reason);
-        gameNet.tryToSilentConnect();
+        this.tryToSilentConnect();
     }
 
     private _hideWaitLayer() {
@@ -577,9 +582,16 @@ export class GameNet extends EventTarget implements ISchedulable {
         }
     }
 
-    public relogin?(success: Function, failure: Function): void;
+    public relogin(success: Function, failure: Function) {
+        hook?.onRelogin(success, failure);
+    }
 
-    public reconnect?(success: Function, failure: Function): void;
+    public reconnect(success: Function, failure: Function) {
+        if (hook?.onReconnect)
+            hook?.onReconnect(success, failure);
+        else
+            this._hideWaitLayer();
+    }
 
     public dispose() {
         if (this._timeoutTimer != null) {
@@ -593,253 +605,263 @@ export class GameNet extends EventTarget implements ISchedulable {
     }
 }
 
-export let gameNet: GameNet;
-export function enable(iswss: boolean = false) {
-    if (!gameNet) {
-        gameNet = new GameNet();
-        gameNet.network.iswss = iswss;
+export const netIns = new class {
+    private _gameNet: GameNet;
+
+    get noMoreConnected() {
+        return this._gameNet?.noMoreConnected;
     }
-}
-
-export function init(ip: string, port: number, gateway_flag: string) {
-    gameNet.network.reset();
-    gameNet.network.init(ip, port, gateway_flag);
-}
-
-export function setProtocol(protocol: any) {
-    innerP = protocol;
-}
-
-let _c2sFilters = {};
-export function addC2sLogFilter(cmd: number) {
-    if (gameNet)
-        gameNet.c2sLogFilters[cmd] = true;
-    else
-        _c2sFilters[cmd] = true;
-}
-
-export function delC2sLogFilter(cmd: number) {
-    if (gameNet)
-        delete gameNet.c2sLogFilters[cmd];
-    else
-        delete _c2sFilters[cmd];
-}
-
-let _s2cFilters = {};
-export function addS2cLogFilter(cmd: number) {
-    if (gameNet)
-        gameNet.s2cLogFilters[cmd] = true;
-    else
-        _s2cFilters[cmd] = true;
-}
-
-export function delS2cLogFilter(cmd: number) {
-    if (gameNet)
-        delete gameNet.s2cLogFilters[cmd];
-    else
-        delete _s2cFilters[cmd];
-}
-
-export function disable() {
-    if (gameNet) {
-        gameNet.network.reset();
-        gameNet.dispose();
-        gameNet = null;
+    set noMoreConnected(value: boolean) {
+        if (this._gameNet)
+            this._gameNet.noMoreConnected = value;
     }
-}
 
-export function addListener(notify: any, listener: Function, thiz?: any) {
-    if (!notify) return;
-    gameNet.addListener(notify, listener, thiz);
-}
+    get rejectConnected() {
+        return this._gameNet?.rejectConnected;
+    }
+    set rejectConnected(value: boolean) {
+        if (this._gameNet)
+            this._gameNet.rejectConnected = value;
+    }
 
-export function removeListener(notify: any, listener: Function, thiz?: any) {
-    if (!notify) return;
-    gameNet.removeListener(notify, listener, thiz);
-}
+    get connected() { return this._gameNet?.network.connected() ?? false; }
 
-// 增加事件监听（socket连接、socket错误、socket关闭、错误码、心跳包阻塞、断开连接、重新建立连接）
-export function addEventListener(
-    type: "connect" | "ioError" | "close" | "errorCode" | "netHeartBlock" | "connectionLost" | "connectReestablished",
-    listener: Function,
-    thisObject?: any,
-    once?: boolean) {
-    gameNet.on(type, listener as any, thisObject, once);
-}
+    setHook(_hook: gFramework.INetworkHook) {
+        hook = hook;
+    }
 
-export function removeEventListener(
-    type: "connect" | "ioError" | "close" | "errorCode" | "netHeartBlock" | "connectionLost" | "connectReestablished",
-    listener: Function,
-    thisObject?: any
-) {
-    gameNet.off(type, listener as any, thisObject);
-}
-
-export function targetOff(target: any) {
-    // 游戏在没有初始化网络模块的时候重启，会报错
-    if (!gameNet)
-        return;
-    gameNet.targetOff(target);
-}
-
-export function send<T>(request: Constructor<T>, data?: ProtoData<T>);
-export function send(request: any, data?: any) {
-    gameNet.send(request, data);
-}
-
-export function call<T>(request: Constructor<T>, data: ProtoData<T>, success?: INetSuccessCallback, failure?: INetFailureCallback, thiz?: any, timeout?: number);
-export function call(request: any, data?: any, success?: INetSuccessCallback, failure?: INetFailureCallback, thiz?: any, timeout: number = 6) {
-    gameNet.call(request, data, success, failure, thiz, timeout * 1000);
-}
-
-export function getServerTime() {
-    return gameNet != void 0 ?
-        Date.now() + gameNet.serverDTime :
-        new Date().getTime();
-}
-
-export function getServerTimeSec() {
-    return getServerTime() * 1e-3 >> 0;
-}
-
-export function getServerTimeFloatSec() {
-    return getServerTime() * 1e-3;
-}
-
-export function getServerDTime() {
-    return gameNet.serverDTime;
-}
-
-export function pause() {
-    gameNet.pause();
-}
-
-export function resume() {
-    if (gameNet)
-        gameNet.resume();
-}
-
-export function initServerTime(callback?: Function, failure?: Function) {
-    gameNet.initServerTime(callback, failure);
-}
-
-export function noMoreConnect(value: boolean) {
-    if (gameNet)
-        gameNet.noMoreConnected = value;
-}
-
-export function rejectConnect(value: boolean) {
-    if (gameNet)
-        gameNet.rejectConnected = value;
-}
-
-
-export function setRelogin(relogin: (success: Function, failure: Function) => void) {
-    gameNet.relogin = relogin;
-}
-
-export function setReconnect(reconnect: (success: Function, failure: Function) => void) {
-    gameNet.reconnect = reconnect;
-}
-
-
-export function connected() {
-    return gameNet ? gameNet.network.connected() : false;
-}
-
-export function initAsync(ip: string, port: number, gateway_flag?: string) {
-    return new Promise<void>(function (resolve, reject) {
-        init(ip, port, gateway_flag);
-        function unregister() {
-            removeEventListener("connect", onConnect, null);
-            removeEventListener("connectReestablished", onConnect, null);
-            removeEventListener("close", onClose, null);
-            removeEventListener("ioError", onError, null);
+    enable(iswss: boolean = false) {
+        if (!this._gameNet) {
+            this._gameNet = new GameNet();
+            this._gameNet.network.iswss = iswss;
         }
-        function onConnect() {
-            unregister();
-            resolve();
-        }
-        function onClose(closeEvt) {
-            unregister();
-            // reject('network closed');
-            reject(closeEvt.type ? new Error(closeEvt.type) : new Error('' + closeEvt))
-        }
-        function onError(errorEvt) {
-            unregister();
-            // reject('network error');
-            reject(errorEvt.type ? new Error(errorEvt.type) : new Error('' + errorEvt));
-        }
-        addEventListener("connect", onConnect, null);
-        addEventListener("connectReestablished", onConnect, null);
-        addEventListener("close", onClose, null);
-        addEventListener("ioError", onError, null);
-    });
-}
+    }
 
-export function initServerTimeAsync() {
-    return new Promise<void>(function (resolve, reject) {
-        initServerTime(resolve, reject);
-    });
-}
+    disable() {
+        const gameNet = this._gameNet;
+        if (gameNet) {
+            gameNet.network.reset();
+            gameNet.dispose();
+            this._gameNet = void 0;
+        }
+    }
 
-export function acall<T, TRep = any>(request: Constructor<T>, data?: ProtoData<T>, time?: number): Promise<TRep>;
-export function acall(request: any, data?: any, time?: number): Promise<any> {
-    return new Promise(function (resolve, reject) {
-        call(request, data, function (evt: NetEvent) {
-            resolve(evt.msg);
-        }, function (code) {
-            reject(code);
-        }, undefined, time);
-    });
-}
+    init(ip: string, port: number, gateway_flag?: string) {
+        debugUtil.assert(!!this._gameNet);
+        this._gameNet.network.reset();
+        this._gameNet.network.init(ip, port, gateway_flag);
+    }
 
-export const kSaveACallRetSuccess = 1;
-export const kSaveACallRetFailure = 0;
-export function save_acall<T = any>(request: any, data?: any, time?: number): Promise<{ result: number, msg: T, code: number }> {
-    return acall(request, data, time)
-        .then(
-            (msg) => {
-                return { result: kSaveACallRetSuccess, msg: msg, code: 0 };
-            },
-            (code) => {
-                return { result: kSaveACallRetFailure, msg: null, code: code };
+    initAsync(ip: string, port: number, gateway_flag?: string) {
+        const that = this;
+        return new Promise<void>(function (resolve, reject) {
+            that.init(ip, port, gateway_flag);
+            function unRegister() {
+                that.removeEventListener('connect', onConnect, void 0);
+                that.removeEventListener('connectReestablished', onConnect, void 0);
+                that.removeEventListener('close', onClose, void 0);
+                that.removeEventListener('ioError', onError, void 0);
             }
-        ) as Promise<{ result: number, msg: T, code: number }>
-}
-
-export function create_save_reject(code: number = 0) {
-    return Promise.resolve({ result: kSaveACallRetFailure, msg: null, code: code })
-}
-
-export function gm(cmd: string) {
-    if (gFramework.useGM)
-        gFramework.gameIns.gm(cmd)
-}
-
-export function gmc(cmd: string) {
-    if (gFramework.useGM)
-        return new Promise<ExecuteGMResult>(resolve => {
-            if (gFramework.gameIns)
-                gFramework.gameIns.gm(cmd, resolve);
-            else
-                resolve(ExecuteGMResult.Fail);
+            function onConnect() {
+                unRegister();
+                resolve();
+            }
+            function onClose(closeEvt) {
+                unRegister();
+                reject(closeEvt.type ? new Error(closeEvt.type) : new Error('' + closeEvt));
+            }
+            function onError(errorEvt) {
+                unRegister();
+                reject(errorEvt.type ? new Error(errorEvt.type) : new Error('' + errorEvt));
+            }
+            that.addEventListener('connect', onConnect, void 0);
+            that.addEventListener('connectReestablished', onConnect, void 0);
+            that.addEventListener('close', onClose, void 0);
+            that.addEventListener('ioError', onError, void 0);
         });
-    else
-        return Promise.resolve(ExecuteGMResult.Fail);
-}
+    }
 
-/** 模拟推送协议 */
-export function simulatePush(cmd: string, bytes: Uint8Array) {
-    gameNet.simulatePush(cmd, bytes);
-}
+    pause() {
+        this._gameNet?.pause();
+    }
 
-/** 协议解码 */
-export function decodeProto<T = any>(cmd: string, bytes: Uint8Array) {
-    return gameNet.decodeProto<T>(cmd, bytes);
-}
+    resume() {
+        this._gameNet?.resume();
+    }
 
-/** 协议编码 */
-export function encodeProto<T = any>(cmd: string, data: any) {
-    return gameNet.encodeProto<T>(cmd, data);
+    connect(ip: string, port: number, gateway_flag: string) {
+        const gameNet = this._gameNet;
+        debugUtil.assert(!!gameNet);
+        gameNet.network.reset();
+        gameNet.network.init(ip, port, gateway_flag);
+    }
+
+    setProtocol(protocol: any) {
+        innerP = protocol;
+    }
+
+    addC2sLogFilter(cmd: number) {
+        const gameNet = this._gameNet;
+        if (gameNet)
+            gameNet.c2sLogFilters[cmd] = true;
+        _c2sFilters[cmd] = true;
+    }
+
+    delC2sLogFilter(cmd: number) {
+        const gameNet = this._gameNet;
+        if (gameNet)
+            delete gameNet.c2sLogFilters[cmd];
+        delete _c2sFilters[cmd];
+    }
+
+    addS2cLogFilter(cmd: number) {
+        const gameNet = this._gameNet;
+        if (gameNet)
+            gameNet.s2cLogFilters[cmd] = true;
+        _s2cFilters[cmd] = true;
+    }
+
+    delS2cLogFilter(cmd: number) {
+        const gameNet = this._gameNet;
+        if (gameNet)
+            delete gameNet.s2cLogFilters[cmd];
+        delete _s2cFilters[cmd];
+    }
+
+    addListener(notify: any, listener: Function, thiz?: any) {
+        if (!notify) return;
+        this._gameNet?.addListener(notify, listener, thiz);
+    }
+
+    removeListener(notify: any, listener: Function, thiz?: any) {
+        if (!notify) return;
+        this._gameNet?.removeListener(notify, listener, thiz);
+    }
+
+    removeListenersWithTarget(target: any) {
+        this._gameNet?.targetOff(target);
+    }
+
+    /**
+     * 增加事件监听。
+     * connect：socket连接，
+     * ioError：socket错误，
+     * close：socket关闭，
+     * errorCode：错误码，
+     * netHeartBlock：心跳包阻塞，
+     * connectionLost：断开连接，
+     * connectReestablished：重新建立连接
+     */
+    addEventListener(
+        type: NEventType,
+        listener: Function,
+        thisObject?: any,
+        once?: boolean
+    ) {
+        this._gameNet?.on(type, listener as any, thisObject, once);
+    }
+
+    /**
+     * 移除事件监听。
+     * connect：socket连接，
+     * ioError：socket错误，
+     * close：socket关闭，
+     * errorCode：错误码，
+     * netHeartBlock：心跳包阻塞，
+     * connectionLost：断开连接，
+     * connectReestablished：重新建立连接
+     */
+    removeEventListener(
+        type: NEventType,
+        listener: Function,
+        thisObject?: any
+    ) {
+        this._gameNet?.off(type, listener as any, thisObject);
+    }
+
+    send<T>(request: Constructor<T>, data?: ProtoData<T>);
+    send(request: any, data?: any) {
+        this._gameNet?.send(request, data);
+    }
+
+    call<T>(request: Constructor<T>, data?: ProtoData<T>, success?: INetSuccessCallback, failure?: INetFailureCallback, thiz?: any, timeoutSec?: number);
+    call(request: any, data?: any, success?: INetSuccessCallback, failure?: INetFailureCallback, thiz?: any, timeoutSec?: number) {
+        this._gameNet?.call(request, data, success, failure, thiz ?? void 0, (timeoutSec ?? 6) * 1000);
+    }
+
+    acall<T, TRet = any>(request: Constructor<T>, data?: ProtoData<T>, timeoutSec?: number): Promise<TRet>;
+    acall(request: any, data?: any, timeoutSec?: number): Promise<any> {
+        const that = this;
+        return new Promise(function (resolve, reject) {
+            that.call(
+                request, data,
+                evt => resolve(evt.msg),
+                code => reject(code),
+                void 0, timeoutSec
+            );
+        });
+    }
+
+    save_acall<T, TRet = any>(request: Constructor<T>, data?: ProtoData<T>, timeoutSec?: number): Promise<{ result: SaveACallRet, msg?: TRet, code?: number }>;
+    save_acall(request: any, data?: any, timeoutSec?: number): Promise<{ result: SaveACallRet, msg?: any, code?: number}> {
+        return this.acall(request, data, timeoutSec)
+            .then(
+                msg => ({ result: SaveACallRet.Success, msg }),
+                code => ({ result: SaveACallRet.Failure, code })
+            );
+    }
+
+    create_save_reject(code: number = 0) {
+        return Promise.resolve({ result: SaveACallRet.Failure, code });
+    }
+
+    getServerTime() {
+        const gameNet = this._gameNet;
+        return gameNet != void 0 ?
+            Date.now() + gameNet.serverDTime :
+            Date.now();
+    }
+
+    getServerTimeSec() {
+        return this.getServerTime() * 1e-3 >> 0;
+    }
+
+    getServerTimeFloatSec() {
+        return this.getServerTime() * 1e-3;
+    }
+
+    getServerDTime() {
+        return this._gameNet?.serverDTime ?? 0;
+    }
+
+    initServerTime(callback?: Function, failure?: Function) {
+        this._gameNet?.initServerTime(callback, failure);
+    }
+
+    initServerTimeAsync() {
+        const that = this;
+        return new Promise<void>(function (resolve, reject) {
+            that.initServerTime(resolve, reject);
+        });
+    }
+
+    gm(gmStr: string) {
+        if (gFramework.useGM)
+            gFramework.gameIns?.gm(gmStr);
+    }
+
+    /** 模拟推送协议 */
+    simulatePush(cmd: string, bytes: Uint8Array) {
+        this._gameNet?.simulatePush(cmd, bytes);
+    }
+
+    /** 协议解码 */
+    decodeProto<T = any>(cmd: string, bytes: Uint8Array) {
+        return this._gameNet?.decodeProto(cmd, bytes);
+    }
+
+    /** 协议编码 */
+    encodeProto<T>(cmd: string, data: any) {
+        return this._gameNet?.encodeProto<T>(cmd, data);
+    }
 }

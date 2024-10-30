@@ -3,7 +3,6 @@ import { WECHAT } from "cc/env";
 import { getGlobal } from "./base/base";
 import { debugUtil } from "./base/debugUtil";
 import { systemMgr } from "./base/SystemMgr";
-import * as net from "./net/GameNet";
 import { ResMgr } from "./res/ResMgr";
 import { timerCenter } from "./timer/TimerCenter";
 import { AsyncWaiter } from "./utils/AsyncWaiter";
@@ -27,7 +26,6 @@ export function initGameFramework(gameIns: IGameInstance) {
     gf.layerMgr = new LayerMgr();
     gf.viewMgr = new ViewMgr();
     gf.systemMgr = systemMgr;
-    getGlobal().Net = gf.net = net;
     gf.timerCenter = timerCenter;
     if (WECHAT)
         gf.localStorage = new WechatStorage();

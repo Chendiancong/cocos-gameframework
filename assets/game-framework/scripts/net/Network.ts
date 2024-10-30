@@ -12,7 +12,7 @@ bufferPool.get = function () {
     return bufferPool._get() || new ByteArray();
 }
 
-export class NetworkHandler extends EventTarget implements ISchedulable {
+export class Network extends EventTarget implements ISchedulable {
     public static HEAD_SIZE: number = 8;
 
     public iswss: boolean = false;
@@ -30,7 +30,7 @@ export class NetworkHandler extends EventTarget implements ISchedulable {
 
     constructor() {
         super();
-        this.id = 'NetworkHandler';
+        this.id = 'Network';
         this.uuid = getUuid();
         Scheduler.enableForTarget(this);
         this._sendBuf = new ByteArray();
@@ -136,17 +136,17 @@ export class NetworkHandler extends EventTarget implements ISchedulable {
     update() {
         if (!this._paused) {
             let size = this._getSendBufferSize();
-            if (size >= NetworkHandler.HEAD_SIZE) {
+            if (size >= Network.HEAD_SIZE) {
                 this._webSocket.writeBytes(this._sendBuf);
                 this._sendBuf.clear();
             }
             let bConsumed: boolean = false;
-            while (this._receiveBuf.readAvailable >= NetworkHandler.HEAD_SIZE) {
+            while (this._receiveBuf.readAvailable >= Network.HEAD_SIZE) {
                 let len = this._receiveBuf.readUnsignedShort();
                 let seq = this._receiveBuf.readUnsignedShort();
                 let cmd = this._receiveBuf.readUnsignedInt();
                 if (this._receiveBuf.readAvailable < len) {
-                    this._receiveBuf.position -= NetworkHandler.HEAD_SIZE;
+                    this._receiveBuf.position -= Network.HEAD_SIZE;
                     break;
                 }
                 let buffer = bufferPool.get();
