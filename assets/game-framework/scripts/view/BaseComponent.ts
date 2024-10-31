@@ -76,6 +76,9 @@ export class BaseComponent<T = any> extends Component {
         }
     }
 
+    private _propsInited: boolean = false;
+    public get propsInited() { return this._propsInited; }
+
     private _dataChanged(data: any): void {
         this.data = data;
     }
@@ -101,8 +104,51 @@ export class BaseComponent<T = any> extends Component {
 
     get myObserveWhenEnable() { return this.observeWhenEnable; }
 
+    static initProp<T extends BaseComponent>(instance: T, clazz: Constructor<T>) {
+        if (instance._propsInited)
+            return;
+
+        instance._propsInited = true;
+        instance.node.on(CustomEvent.DATA_CHANGE, instance._dataChanged, instance);
+        instance.node.on(CustomEvent.ITEM_SELECT, instance._onItemSelect, instance);
+
+        let fcom: fgui.GComponent;
+        if (!(fcom = instance.fcom))
+            return;
+
+        if (!clazz)
+            return;
+
+        const fprops = clazz['_fprops'] as Record<string, IFProp>;
+        if (!fprops || !(fcom instanceof fgui.GComponent))
+            return;
+
+        let pkgId: string, itemId: string;
+        if (fcom.packageItem) {
+            let pkgItem = fcom.packageItem.getBranch();
+            pkgId = pkgItem.owner.id;
+            itemId = pkgItem.id;
+        }
+
+        const option: FPropHandleOption = {
+            instance,
+            fcom,
+            fchild: void 0,
+            fprop: void 0,
+            propName: '',
+            ccNode: instance.node
+        }
+        for (const pname in fprops) {
+            const fprop = fprops[pname];
+            option.fprop = fprop;
+            option.propName = pname;
+            option.fchild = void 0;
+            FPropUtil.initHelper(option);
+        }
+    }
+
     __preload() {
-        this.initProp(this);
+        this.legacyInitProp(this);
         if (this.observeWhenEnable) {
             this._observerModleFun();
         }
@@ -232,8 +278,10 @@ export class BaseComponent<T = any> extends Component {
 
     closePopup: () => void;
 
-    private _propsInited: boolean = false;
-    initProp(instance: BaseComponent = this, clazz = js.getClassByName(js.getClassName(this))) {
+    /**
+     * @deprecated legacy
+     */
+    legacyInitProp(instance: BaseComponent = this, clazz = js.getClassByName(js.getClassName(this))) {
         if (instance._propsInited)
             return;
 
@@ -401,3 +449,186 @@ export interface BaseComponent extends ObserverClass { }
 applyMixins(BaseComponent, [ObserverClass]);
 
 getGlobal().BaseComponent = BaseComponent;
+
+export type FPropHandleOption<TChild extends fgui.GObject = fgui.GObject> = {
+    readonly instance: any,
+    readonly fcom: fgui.GComponent,
+    fchild: TChild,
+    fprop: IFProp,
+    propName: string,
+    readonly ccNode: Node;
+}
+
+export class FPropUtil {
+    static fctrl({ instance, propName, fcom }: FPropHandleOption) {
+        instance[propName] = fcom.getController(propName);
+    }
+
+    static fanim({ instance, propName, fcom }: FPropHandleOption) {
+        instance[propName] = fcom.getTransition(propName);
+    }
+
+    static ftype({ instance, fprop, fchild, propName }: FPropHandleOption) {
+        const type = fprop.type;
+        fchild.ccRenderer = type;
+        const comp = fchild.ccRender;
+
+        const params = fprop.params;
+        if (!!params)
+            Object.keys(params)
+                .forEach(key => comp[key] = params[key]);
+
+        comp.node.name = propName;
+        instance[propName] = comp;
+    }
+
+    static fprop({ instance, fchild, propName }: FPropHandleOption) {
+        fchild.node.name = propName;
+        instance[propName] = fchild;
+    }
+
+    static fbatch({ fchild }: FPropHandleOption) {
+        let node = fchild.node;
+        if (fchild instanceof fgui.GList)
+            node = fchild._container;
+        if (node?.isValid)
+            getOrAddComponent(node, NodeBatchable);
+    }
+
+    static fpreventBatch({ fchild }: FPropHandleOption) {
+        const node = fchild.node;
+        NodeBatchable.setPreventBatchNode(node);
+    }
+
+    static floader({ fprop, fchild: _fchild, instance }: FPropHandleOption) {
+        const loader = fprop.loader;
+        const renderer = loader.type;
+        const packageName = loader.packageName;
+        const viewName = loader.viewName;
+        const fchild = _fchild as fgui.GLoader;
+        fchild.componentTouch = true;
+        fchild.componentRender = true;
+        fchild.ccRenderer = renderer;
+        if (packageName && viewName) {
+            if (fgui.UIPackage.getByName(packageName)) {
+                ResKeeper.register(
+                    fchild.node,
+                    fgui.UIPackage.getByName(packageName)
+                );
+                fchild.url = gFramework.viewMgr.getItemURL(packageName, viewName);
+            } else {
+                const pkg = getOrAddComponent(fchild.node, FPackage);
+                pkg.packageName = packageName;
+                pkg.node.once(
+                    FPackage.EventType.loaded,
+                    function () {
+                        (fchild as fgui.GLoader).url = gFramework.viewMgr.getItemURL(packageName, viewName);
+                    },
+                    instance
+                );
+            }
+        }
+    }
+
+    static fcomp({ fchild, fprop }: FPropHandleOption) {
+        const isLoader = fchild instanceof fgui.GLoader;
+        const isJobConstruct = fchild instanceof fgui.GComponent && fchild.isJobConstruct;
+        for (const e of fprop.comp) {
+            if (isLoader)
+                (fchild as fgui.GLoader).addContentRenderer(e.comp, e.params);
+            else if (isJobConstruct)
+                (fchild as fgui.GComponent).addAsyncComponentRenderer(e.comp, e.params);
+            else
+                fchild.addRenderer(e.comp, e.params);
+        }
+    }
+
+    static fvirtual({ fchild }: FPropHandleOption<fgui.GList>) {
+        fchild.setVirtual();
+    }
+
+    static flistRenderer({ fchild, fprop }: FPropHandleOption<fgui.GList>) {
+        fchild.ccItemRenderer = fprop.itemRenderer;
+    }
+
+    static initHandle({ fchild, fprop, ccNode }: FPropHandleOption) {
+        getOrAddComponent(ccNode, BaseComponentStart)
+            .initHandlers
+                .push(fprop.initHandle.bind(void 0, fchild, fprop));
+    }
+
+    static findChild({ instance, fprop, fcom }: Omit<FPropHandleOption, 'fchild'>) {
+        let fchild: fgui.GObject;
+
+        if (!!fprop.names) {
+            // 按名字列表获取属性
+            fchild = fcom.getChildByNames(fprop.names);
+        }
+
+        if (!fchild) {
+            // 递归获取属性
+            fchild = fGetChild(fcom, fprop.name);
+            if (fchild) {
+                // 记录属性名字列表
+                let tempChild = fchild;
+                const names = fprop.names = [];
+                do {
+                    names.push(tempChild.name);
+                    tempChild = tempChild.parent;
+                } while (tempChild !== fcom);
+
+                names.reverse();
+            }
+        }
+
+        if (!fchild) {
+            if (fprop.required !== false)
+                console.error(`can not found ${fprop.path || fprop.name} at ${js.getClassName(instance)}`);
+        }
+
+        return fchild;
+    }
+
+    static initHelper(option: FPropHandleOption) {
+        const fprop = option.fprop;
+        do {
+            if (fprop.ctrl) {
+                this.fctrl(option);
+                break;
+            }
+
+            if (fprop.anim) {
+                this.fanim(option);
+                break;
+            }
+
+            option.fchild = this.findChild(option);
+
+            if (fprop.type)
+                this.ftype(option);
+            else
+                this.fprop(option);
+
+            if (fprop.batch)
+                this.fbatch(option);
+            if (fprop.preventBatch)
+                this.fpreventBatch(option);
+
+            if (fprop.loader && (option.fchild instanceof fgui.GLoader))
+                this.floader(option);
+            if (fprop.comp)
+                this.fcomp(option);
+
+            if (option.fchild instanceof fgui.GList) {
+                const _option = option as FPropHandleOption<fgui.GList>;
+                if (fprop.virtual)
+                    this.fvirtual(_option);
+                if (fprop.itemRenderer)
+                    this.flistRenderer(_option);
+            }
+
+            if (fprop.initHandle)
+                this.initHandle(option);
+        } while (false);
+    }
+}

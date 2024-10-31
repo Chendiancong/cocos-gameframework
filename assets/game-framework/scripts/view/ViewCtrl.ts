@@ -441,11 +441,11 @@ export class ViewCtrl extends Component {
             widgets = this.widgets,
             info = this.info;
         view = this.view;
-        view.initProp(view, info.clazz);
+        view.legacyInitProp(view, info.clazz);
         if (widgets) {
             for (let i = 0, il = widgets.length, comp; i < il; i++) {
                 comp = getOrAddComponent(view, widgets[i]);
-                view.initProp(comp, widgets[i]);
+                view.legacyInitProp(comp, widgets[i]);
             }
         }
     }

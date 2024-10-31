@@ -68,8 +68,8 @@ function fprop_helper(prop: IFProp, classPrototype: any, p: string) {
     }
 
     // 可选属性记录属性在组件中的存在性，提高组件不存在属性时的查找效率
-    if (fprops[p].required === false)
-        fprops[p].exist = new MarkExisted();
+    // if (fprops[p].required === false)
+    //     fprops[p].exist = new MarkExisted();
 }
 function doNothing() { }
 function fclass_helper(prop: IViewRegisterInfo, classConstructor: any) {
