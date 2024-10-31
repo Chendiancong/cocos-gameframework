@@ -136,6 +136,7 @@ export class MergedMeshExporter extends Component {
 
         const pako = window.pako;
         const compressedData = pako.deflate(arrayBuffer)
+        // @ts-ignore
         return Buffer.from(compressedData);
     }
 

@@ -346,7 +346,7 @@ export class ViewCtrl extends Component {
         if (!this.view) {
             addTask(ViewCtrl.TaskId, (task) => {
                 if (this._state !== kViewState.Closed) {
-                    this._createView(this._createFgui());
+                    this._lagacyCreateView(this._createFgui());
                 }
                 this._state = kViewState.Loaded;
                 task.done();
@@ -422,7 +422,10 @@ export class ViewCtrl extends Component {
         return fcom;
     }
 
-    private _createView(fgui: fgui.GComponent) {
+    /**
+     * @deprecated lagacy
+     */
+    private _lagacyCreateView(fgui: fgui.GComponent) {
         let openKey = this.openKey,
             info = this.info;
         let view: BaseWin;

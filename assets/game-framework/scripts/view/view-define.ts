@@ -27,20 +27,3 @@ export enum kUiParam {
     Collect,
 }
 gameEnum(kUiParam, "kUiParam");
-
-export enum kPreviewType {
-    attrPreviewRole = 101,
-    attrPreviewEquipWear = 102,
-    attrPreviewFabao = 103,
-    attrPreviewOtherRoleInfo = 104,
-    attrPreviewMiji = 105,
-    attrPreviewShenBing = 106,
-    attrPreviewGuildHunt = 107,
-    attrPreviewBeastSoul = 108,//兽魂
-    attrPreviewJTGXMonster = 109,//九天归墟
-    attrPreviewCloth = 110,//时装
-}
-gameEnum(kPreviewType, "kPreviewType");
-
-
-

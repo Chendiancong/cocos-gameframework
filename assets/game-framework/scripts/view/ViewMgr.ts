@@ -1,12 +1,12 @@
 import { UILayer } from "./LayerMgr";
 import { fgui } from "../base/base";
-import { EventTarget, Rect, director, js, v2, view } from "cc";
+import { EventTarget, Rect, js } from "cc";
 import { BaseWin } from "./BaseWin";
 import { BaseComponent } from "./BaseComponent";
 import { createViewCtrl, ViewCtrl } from "./ViewCtrl";
 import { CustomEvent } from "../events/Event";
 import { DEBUG } from "cc/env";
-import { GLoader, GObject, GObjectPool } from "fairygui-cc";
+import { GObject, GObjectPool } from "fairygui-cc";
 import { ITimerHandler, timerCenter } from "../timer/TimerCenter";
 
 const _offWidth: number = 80;
@@ -347,10 +347,6 @@ export class ViewMgr extends EventTarget {
                 this._updateMask();
             }
         } else {
-            //TODO
-            if (uiModel.BASEMIXFULLUIHEIGHT && ctrl.view.fcom.height > uiModel.BASEMIXFULLUIHEIGHT) {
-                ctrl.view.fcom.height = uiModel.BASEMIXFULLUIHEIGHT;
-            }
             this._timer = timerCenter.doDelay(300, () => {
                 if (ctrl && ctrl.isValid) {
                     this._updateVisible(ctrl, null);
@@ -452,20 +448,19 @@ export class ViewMgr extends EventTarget {
 
     updateVisibleAll() {
         let ctrl: ViewCtrl;
-        if (gFramework.layerMgr.layerFlagIndex > 0) {
-            guideModel.hideGuide();
-            for (let i = 1; i < this._ctrlStack.length; i++) {
-                ctrl = this._ctrlStack[i];
-                if (!ctrl) continue;
-                if (ctrl.layer != UILayer.UI_Main) {
-                    if (!ctrl.loaded || ctrl.border || ctrl.maskIgnore) continue;
-                    if (!!ctrl.view) {
-                        ctrl.hide();
-                    }
-                }
-            };
-        } else {
-            guideModel.showGuide();
+        // if (gFramework.layerMgr.layerFlagIndex > 0) {
+        //     guideModel.hideGuide();
+        //     for (let i = 1; i < this._ctrlStack.length; i++) {
+        //         ctrl = this._ctrlStack[i];
+        //         if (!ctrl) continue;
+        //         if (ctrl.layer != UILayer.UI_Main) {
+        //             if (!ctrl.loaded || ctrl.border || ctrl.maskIgnore) continue;
+        //             if (!!ctrl.view) {
+        //                 ctrl.hide();
+        //             }
+        //         }
+        //     };
+        {
             let len = this._ctrlStack.length - 1;
             let tempLayer = [];
             for (let i = len; i >= 0; i--) {
@@ -506,10 +501,10 @@ export class ViewMgr extends EventTarget {
         } else {
             ctrl = stack[--index];
             if (!ctrl) return;
-            if (this._ctrlStack.indexOf(ctrl) < gFramework.layerMgr.layerFlagIndex) {
-                ctrl.hide();
-                return;
-            }
+            // if (this._ctrlStack.indexOf(ctrl) < gFramework.layerMgr.layerFlagIndex) {
+            //     ctrl.hide();
+            //     return;
+            // }
             if (!ctrl.loaded || ctrl.border || ctrl.maskIgnore) {
                 this._checkMaskFlag(stack, index, false);
             } else {

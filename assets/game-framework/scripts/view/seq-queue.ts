@@ -64,7 +64,7 @@ export class SeqQueue extends EventTarget {
     }[];
 
     curId: number;
-    timerId: NodeJS.Timeout;
+    timerId: any;
     timeout: number;
 
     constructor(timeout: number) {

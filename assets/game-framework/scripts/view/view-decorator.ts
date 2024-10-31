@@ -4,7 +4,6 @@ import { BaseComponent } from "./BaseComponent";
 import { fgui } from "../base/base";
 import { applyMixins } from "../base/jsUtil";
 import { ViewMgr } from "./ViewMgr";
-import { FBtn } from "./FBtn";
 const { ccclass } = _decorator;
 
 const _global: any = typeof window === "object" ? window :
@@ -188,10 +187,6 @@ export function fname(name: string) {
 
 export function foptional(classPrototype: any, p: string) {
     fprop_helper({ required: false }, classPrototype, p);
-}
-
-export function fbtn(params: { [x: string]: any }) {
-    return fprop({ type: FBtn, params });
 }
 
 export function fpresstip(params: { [x: string]: any }) {
