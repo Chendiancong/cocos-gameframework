@@ -1,7 +1,9 @@
-import { __private } from "cc";
-import { BaseComponent, FPropHandleOption, FPropUtil } from "./BaseComponent";
+import { __private, Prefab } from "cc";
+import { BaseComponent } from "./BaseComponent";
 import { observerable, ObserverClass } from "../events/ObserverClass";
 import { GComponent } from "fairygui-cc";
+import { FPropHandleContext, fpropUtil } from "./FPropUtil";
+import { isExtends } from "../base/jsUtil";
 
 export interface FScript<T = any> extends ObserverClass {}
 
@@ -47,7 +49,7 @@ export class FScript<T = any> {
         if (!fprops || !(fcom instanceof GComponent))
             return;
 
-        const option: FPropHandleOption = {
+        const context: FPropHandleContext = {
             instance,
             fcom,
             fchild: void 0,
@@ -57,9 +59,9 @@ export class FScript<T = any> {
         }
         for (const pname in fprops) {
             const fprop = fprops[pname];
-            option.fprop = fprop;
-            option.propName = pname;
-            FPropUtil.initHelper(option);
+            context.fprop = fprop;
+            context.propName = pname;
+            fpropUtil.initHelper(context);
         }
     }
 
@@ -125,4 +127,24 @@ export class FScriptComponent<T = any> extends BaseComponent<T> {
     onDispose() {
         this._fscript && this._fscript['onDispose']();
     }
+
+    static createClassWithFScript(type: Constructor<FScript>) {
+        const key = '$fscriptComp';
+        return type[key] ??
+            (type[key] = class extends FScriptComponent {
+                __preload(): void {
+                    super.__preload && super.__preload.call(this, ...arguments);
+                    this.fscript = new type();
+                }
+            });
+    }
 }
+
+fpropUtil.setCompSetupHandler({
+    onConvertComponent(type: Constructor<ViewDef.ViewComp>) {
+        if (isExtends(type, FScript))
+            return FScriptComponent.createClassWithFScript(type as Constructor<FScript>);
+        else
+            return void 0;
+    },
+})

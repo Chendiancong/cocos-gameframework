@@ -4,21 +4,18 @@ import * as fgui from 'fairygui-cc';
 import { gMath } from '../utils/math/MathUtil';
 import { PoolManager } from '../base/ObjectPool';
 import { PooledVec3 } from '../utils/math/PooledCCValues';
-const { ccclass, property } = _decorator;
+import { IGameInstance } from '../base/BaseGameInstance';
+const { ccclass } = _decorator;
 
 export enum UILayer {
-    /** launch层 */
-    UI_Zero,
+    /** 根层，该层不应该被使用 */
+    UI_Root,
     /** 低层 */
     UI_Low,
-    /** 战斗层 */
-    UI_Fight,
-    /** 战斗UI */
+    /** 世界UI */
     UI_World,
     /** 主界面 */
     UI_Main,
-    /** hud层 */
-    UI_Hud,
     /** Low窗口层 */
     UI_PopWindow_Low,
     /** 默认窗口层 */
@@ -27,8 +24,6 @@ export enum UILayer {
     UI_PopWindow_Top,
     /** 引导层 */
     UI_Guide,
-    /** 奖励弹窗层 */
-    UI_PopAward,
     /** 弹窗界面 */
     UI_Dialog,
     /** Tip层，该层需要点击事件 */
@@ -75,31 +70,22 @@ export class LayerMgr extends EventTarget {
     private _borderSize: number = 0;
     private _orientation: "landscape" | "portrait" = "landscape";
 
-    initRoot(rootNode?: Node) {
-        rootNode = rootNode ?? director.getScene().getChildByName("Canvas") ?? director.getScene();
+    init({ uiRootNode: rootNode }: IGameInstance) {
+        rootNode = rootNode ?? director.getScene().getChildByName('Canvas') ?? director.getScene();
         this.fRoot = fgui.GRoot.create(rootNode);
-        let layer = this._fguiLayers[UILayer.UI_Zero] = new FGUILayerNode(UILayer.UI_Zero);
-        this.fRoot.addChild(layer);
-        layer.addRelation(this.fRoot, fgui.RelationType.Size);
-        window.addEventListener("resize", this._onWindowResize.bind(this));
-        this.fRoot.node.on("SafeArea", this.onSafeArea, this);
-        this._wechatCompatible();
-        this._onWindowResize();
-        this.adapt();
-    }
+        this.mainLayer = new FGUILayerNode(UILayer.UI_Root);
+        this.mainLayer.node.name = UILayer[UILayer.UI_Root];
+        this.fRoot.addChild(this.mainLayer);
+        this.mainLayer.addRelation(this.fRoot, fgui.RelationType.Size);
 
-    init() {
-        this.mainLayer = new FGUILayerNode(UILayer.UI_Low);
-        this.mainLayer.visible = false;
-        for (let i = UILayer.UI_Zero; i <= UILayer.UI_Top; i++) {
+        for (let i = UILayer.UI_Low; i <= UILayer.UI_Top; ++i) {
             const layer = this._fguiLayers[i] = new FGUILayerNode(i);
             layer.node.name = UILayer[i] ?? 'GComponent';
-            this.mainLayer.addChildAt(layer, this.mainLayer.numChildren);
+            this.mainLayer.addChild(layer);
             layer.makeFullContainer(this.mainLayer);
             layer.addRelation(this.mainLayer, fgui.RelationType.Size);
         }
-        this.fRoot.addChild(this.mainLayer);
-        this.mainLayer.addRelation(this.fRoot, fgui.RelationType.Size);
+
         this._wechatCompatible();
         this._onWindowResize();
         this.adapt();

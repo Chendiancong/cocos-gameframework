@@ -1,4 +1,4 @@
-import { clamp, Component, Constructor, error, game, js, lerp, tween, Tween, Vec2, _decorator } from "cc";
+import { Component, Constructor, error, js, lerp, tween, Tween, Vec2, _decorator } from "cc";
 import { fgui } from "../base/base";
 import { defer } from "../base/promise";
 import { getOrAddComponent } from "../utils/util";
@@ -8,6 +8,9 @@ import { addTask } from "./TaskMgr";
 import { DEBUG } from "cc/env";
 import { MyEvent } from "fairygui-cc";
 import { ViewBetween } from "./ViewBetween";
+import { isExtends, xInstanceOf } from "../base/jsUtil";
+import { FScript, FScriptComponent } from "./FScript";
+import { fpropUtil } from "./FPropUtil";
 
 const { ccclass } = _decorator;
 const enum kViewState {
@@ -138,10 +141,6 @@ export class ViewCtrl extends Component {
             return kUiSize.normal;
         }
         return 0;
-    }
-
-    get isSpecial(): boolean {
-        return this.info.special;
     }
 
     get alignMode() {
@@ -345,9 +344,8 @@ export class ViewCtrl extends Component {
         if (this._state === kViewState.Closed) return;
         if (!this.view) {
             addTask(ViewCtrl.TaskId, (task) => {
-                if (this._state !== kViewState.Closed) {
-                    this._lagacyCreateView(this._createFgui());
-                }
+                if (this._state !== kViewState.Closed)
+                    this._createView(this._createFgui());
                 this._state = kViewState.Loaded;
                 task.done();
             });
@@ -423,13 +421,30 @@ export class ViewCtrl extends Component {
     }
 
     /**
-     * @deprecated lagacy
+     * @deprecated legacy
      */
     private _lagacyCreateView(fgui: fgui.GComponent) {
         let openKey = this.openKey,
             info = this.info;
         let view: BaseWin;
-        view = fgui.node.addComponent(info.clazz);
+        view = fgui.node.addComponent(info.clazz as Constructor<BaseWin>);
+        view.openKey = openKey;
+        view.ctrlKey = this.ctrlKey;
+        view.fromKey = this.fromKey;
+        this.view = view;
+    }
+
+    private _createView(fgui: fgui.GComponent) {
+        const openKey = this.openKey,
+            info = this.info;
+        let view: BaseWin;
+        const clazz = fpropUtil.confirmType(info.clazz);
+        if (isExtends(clazz, BaseWin))
+            view = fgui.node.addComponent(clazz as Constructor<BaseWin>);
+        else {
+            view = fgui.node.addComponent(BaseWin);
+            fgui.node.addComponent(clazz);
+        }
         view.openKey = openKey;
         view.ctrlKey = this.ctrlKey;
         view.fromKey = this.fromKey;

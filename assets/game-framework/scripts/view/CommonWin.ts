@@ -3,7 +3,6 @@ import { BaseComponent } from "./BaseComponent";
 import { BaseWin } from "./BaseWin";
 import { fclass, foptional, fprop } from "./view-decorator";
 
-
 @fclass
 export class CommonWin extends BaseComponent {
     @foptional

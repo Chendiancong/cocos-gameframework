@@ -10,7 +10,7 @@ import { CommonStorage, WechatStorage } from "./utils/storage/GameLocalStorage";
 import { LayerMgr } from "./view/LayerMgr";
 import { ViewMgr } from "./view/ViewMgr";
 import { default as cryptoJs } from 'crypto-js';
-import { IGameInstance } from "./base/GameInstance";
+import { IGameInstance } from "./base/BaseGameInstance";
 
 let isInited = false;
 
@@ -21,6 +21,14 @@ export function initGameFramework(gameIns: IGameInstance) {
     isInited = true;
     const global = getGlobal();
     const gf = global.gFramework;
+
+    gf.log = debugUtil.log;
+    gf.forceLog = debugUtil.force_log;
+    gf.warn = debugUtil.warn;
+    gf.error = debugUtil.error;
+    gf.assert = debugUtil.assert;
+
+    gf.cryptoJs = cryptoJs;
     gf.gameIns = gameIns;
     gf.resMgr = new ResMgr();
     gf.layerMgr = new LayerMgr();
@@ -33,49 +41,13 @@ export function initGameFramework(gameIns: IGameInstance) {
         gf.localStorage = new CommonStorage();
     gf.globalEvent = new EventTarget();
     gf.waiter = new AsyncWaiter();
-    gf.showTips = function () {
-        console.log(...arguments);
-    }
-    gf.showAnnounce = function () {
-        console.log(...arguments);
-    }
-    gf.showShili = function () {
-        console.log(...arguments);
-    }
-    gf.showFloatAwardEff = function () {
-        console.log(...arguments);
-    }
-    gf.showAddAwardEff = function () {
-        console.log(...arguments);
-    }
-    gf.showItemTips = function () {
-        console.log(...arguments);
-    }
-    gf.showEquipTips = function () {
-        console.log(...arguments);
-    }
-    gf.showFaBaoTips = function () {
-        console.log(...arguments);
-    }
-    gf.showDescTips = function () {
-        console.log(...arguments);
-    }
-    gf.hideDescTips = function () {
-        console.log(...arguments);
-    }
-    gf.showSpineEff = function () {
-        console.log(...arguments);
-    }
-    gf.showAnnounce = function () {
-        console.log(...arguments);
-    }
-    gf.log = debugUtil.log;
-    gf.forceLog = debugUtil.force_log;
-    gf.warn = debugUtil.warn;
-    gf.error = debugUtil.error;
-    gf.assert = debugUtil.assert;
     gf.soundPlayer = new DefaultSoundPlayer();
-    gf.cryptoJs = cryptoJs;
+
+    postInit(gameIns);
+}
+
+function postInit(gameIns: IGameInstance) {
+    gFramework.layerMgr.init(gameIns);
 }
 
 export function setGameFrameworkSoundPlayer(soundPlayer: gFramework.IGameSoundPlayer) {

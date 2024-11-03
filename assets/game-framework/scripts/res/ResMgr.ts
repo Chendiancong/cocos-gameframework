@@ -1,4 +1,4 @@
-import { Asset, assetManager, AssetManager, Constructor, Game, game, js, resources } from "cc";
+import { Asset, assetManager, AssetManager, Constructor, js, resources } from "cc";
 import { DEBUG } from "cc/env";
 import { UIConfig } from "fairygui-cc";
 import { fgui } from "../base/base";

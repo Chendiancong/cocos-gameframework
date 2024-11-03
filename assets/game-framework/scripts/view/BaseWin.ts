@@ -1,9 +1,9 @@
-import { Camera, Rect, RenderTexture, _decorator, game, renderer, screen, tween } from "cc";
+import { _decorator, Component } from "cc";
 import { fgui } from "../base/base";
 import { BaseComponent } from "./BaseComponent";
 import { CommonWin } from "./CommonWin";
 
-const { ccclass, property } = _decorator;
+const { ccclass } = _decorator;
 
 @ccclass('BaseWin')
 export class BaseWin extends BaseComponent {
@@ -42,33 +42,20 @@ export class BaseWin extends BaseComponent {
     }
 
     closeSelf() {
-        if (this.viewInfo && !this.viewInfo.special) {
-            // let camera = this.node.addComponent(Camera);
-            // camera.rect = new Rect(0, 0, 1, 1);
-            // camera.clearFlags = Camera.ClearFlag.DEPTH_ONLY;
-            // let texture = new RenderTexture();
-            // texture.getGFXTexture
-            // texture.initialize({ height: this.fcom.height, width: this.fcom.width });
-            // camera.targetTexture = texture;
-            // new RenderTexture();
-            // camera.camera.scene.dr
-            // camera.rend
-            // if (this.viewInfo.sizeMode == kUiSize.mixFull) {
-            //     capturePage
-            //     screen.snapShot(this.viewInfo.snapShot);
-            //     let image = screen.capturePage(0, 0, screen.width, screen.height);
-            //     tween(this.fcom).to(0.5, { alpha: 0.6 }).call(() => {
-            //         gFramework.viewMgr.close(this);
-            //     }).start();
-            // } else {
-            gFramework.viewMgr.close(this);
-            // }
-        } else {
-            gFramework.viewMgr.close(this);
-        }
+        gFramework.viewMgr.close(this);
     }
 
     static checkOpen?(params?: any, showTips?: boolean) {
         return true;
     }
+
+    static configBaseWinDelayOnLoad(clazzProtoOrIns: Component) {
+        const delayOnLoad = clazzProtoOrIns['onLoad'];
+        if (delayOnLoad) {
+            clazzProtoOrIns['onLoad'] = doNothing;
+            clazzProtoOrIns['delayOnLoad'] = delayOnLoad;
+        }
+    }
 }
+
+function doNothing() { }

@@ -7,7 +7,7 @@ import { debugUtil } from "../base/debugUtil";
 import { getUuid } from "../base/uuid";
 import { trycatch } from "../base/jsUtil";
 import { EnumGameAppState } from "../datas/GameAppState";
-import { SocketCallResult } from "../base/GameInstance";
+import { SocketCallResult } from "../base/BaseGameInstance";
 
 type ProtoData<T> = Partial<WithoutType<T, Function>>;
 
@@ -198,35 +198,30 @@ export class GameNet extends EventTarget implements ISchedulable {
             debugUtil.log(`received ${protocolStr} seq: ${seq} data:`, this._duplicate(msg));
 
         const gameIns = gFramework.gameIns;
+        const pending = this._pendingCallbacks[seq];
+        if (pending)
+            delete this._pendingCallbacks[seq];
         if (gameIns.enableSocketDataHook) {
             do {
-                const pending = this._pendingCallbacks[seq];
-                if (pending)
-                    delete this._pendingCallbacks[seq];
                 if (gameIns.processSocketData(this, data, msg, pending)) {
-                    do {
+                    outer: do {
                         for (const _ in this._pendingCallbacks)
-                            break;
+                            break outer;
                         this._hideWaitLayer();
                     } while (false);
 
                     break;
                 }
-                this._lagacy_onSocketData(data, msg);
+                this._lagacy_onSocketData(data, msg, pending);
             } while (false);
         } else
-            this._lagacy_onSocketData(data, msg);
+            this._lagacy_onSocketData(data, msg, pending);
     }
 
     /**
      * @deprecated internal
      */
-    private _lagacy_onSocketData(data: SocketData, msg: any) {
-        const {
-            seq
-        } = data;
-
-        const pending = this._pendingCallbacks[seq] ?? void 0;
+    private _lagacy_onSocketData(data: SocketData, msg: any, pending: INetPendingCallback) {
         const result = gFramework.gameIns.convertToSocketCallResult(
             this, data, msg
         );
@@ -235,6 +230,10 @@ export class GameNet extends EventTarget implements ISchedulable {
         } else {
             this.socketDataFail(data, msg, pending);
         }
+
+        for (const _ in this._pendingCallbacks)
+            return;
+        this._hideWaitLayer();
     }
 
     /** 模拟推送协议 */

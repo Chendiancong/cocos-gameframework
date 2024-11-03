@@ -49,6 +49,10 @@ export function hasMixin<T, U>(target: T, baseCtor: Constructor<U>) {
     return mixinCls.includes(baseCtor);
 }
 
+export function isExtends<T, U>(target: Constructor<T>, base: Constructor<U>) {
+    return xInstanceOf(target.prototype, base);
+}
+
 export function xInstanceOf<T>(target: T, baseCtorName: string): boolean;
 export function xInstanceOf<T, U>(target: T, baseCtor: Constructor<U>): boolean;
 export function xInstanceOf(...args: any[]): boolean {

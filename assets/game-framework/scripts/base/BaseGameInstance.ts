@@ -1,3 +1,4 @@
+import { Node } from "cc";
 import { GameAppState } from "../datas/GameAppState";
 import { GameNet, INetPendingCallback, ReturnOfNetCall, SocketData } from "../net/GameNet";
 
@@ -24,8 +25,10 @@ export interface IGameInstance {
     readonly appState: GameAppState;
     /** 是否启用自定义的socket处理器，若为true，必须重写processSocketData */
     readonly enableSocketDataHook: boolean;
-    /** 网络状态钩子构造器 */
+    /** 网络状态钩子构造器，返回undefined表示不需要hook */
     readonly networkHookCtor: Constructor<gFramework.INetworkHook>;
+    /** ui根节点，返回undefined表示默认为Scene/Canvas */
+    readonly uiRootNode: Node;
 
     /** 心跳 */
     heartBeat(gameNet: GameNet, success?: (data: HeartBeatData) => void, failure?: (code: number) => void): NetSeq;
@@ -48,10 +51,12 @@ export interface IGameInstance {
     onNetLost(): void;
 }
 
-export abstract class GameInstance implements IGameInstance {
+export abstract class BaseGameInstance implements IGameInstance {
     appState = new GameAppState();
+
     abstract get enableSocketDataHook(): boolean;
-    get networkHookCtor() { return void 0; }
+    abstract get networkHookCtor();
+    abstract get uiRootNode();
 
     abstract gm(cmd: string, cb?: (ret: ExecuteGMResult) => void): void;
 

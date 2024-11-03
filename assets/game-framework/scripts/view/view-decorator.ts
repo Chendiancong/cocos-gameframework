@@ -2,8 +2,10 @@ import { UILayer } from "./LayerMgr";
 import { Component, Constructor, js, Label, _decorator } from "cc";
 import { BaseComponent } from "./BaseComponent";
 import { fgui } from "../base/base";
-import { applyMixins } from "../base/jsUtil";
+import { applyMixins, isExtends, xInstanceOf } from "../base/jsUtil";
 import { ViewMgr } from "./ViewMgr";
+import { FScript } from "./FScript";
+import { BaseWin } from "./BaseWin";
 const { ccclass } = _decorator;
 
 const _global: any = typeof window === "object" ? window :
@@ -71,7 +73,7 @@ function fprop_helper(prop: IFProp, classPrototype: any, p: string) {
     // if (fprops[p].required === false)
     //     fprops[p].exist = new MarkExisted();
 }
-function doNothing() { }
+
 function fclass_helper(prop: IViewRegisterInfo, classConstructor: any) {
     if (prop?.className)
         ccclass(prop.className)(classConstructor);
@@ -81,61 +83,28 @@ function fclass_helper(prop: IViewRegisterInfo, classConstructor: any) {
         return;
     }
 
-    if (js.getClassName(js.getSuper(classConstructor)) === "BaseWin") {
-        let delayOnLoad = classConstructor.prototype.onLoad;
-        if (delayOnLoad) {
-            classConstructor.prototype.onLoad = doNothing;
-            classConstructor.prototype.delayOnLoad = delayOnLoad;
-        }
-    }
+    if (isExtends(classConstructor, BaseWin))
+        BaseWin.configBaseWinDelayOnLoad(classConstructor.prototype);
 
     let className = js.getClassName(classConstructor);
     if (prop.id == void 0) {
         prop.id = _global.kGameView && _global.kGameView[className] || undefined;
     }
-    prop.layer = prop.layer;
     prop.clazz = classConstructor;
-    prop.packName = prop.packName;
-    prop.viewName = prop.viewName || className;
     prop.className = className;
 
-    if (prop.border) {
-        if (prop.layer == undefined) prop.layer = UILayer.UI_Main;
-        if (prop.sizeMode == undefined) prop.sizeMode = 0;
-        if (prop.mask == undefined) prop.mask = false;
-        if (prop.tweenEffect == undefined) prop.tweenEffect = false;
-        if (prop.afterEffect == undefined) prop.afterEffect = false;
-        if (prop.clickout == undefined) prop.clickout = false;
-    } else {
-        let full = (prop.sizeMode === kUiSize.full) || (prop.sizeMode === kUiSize.mixFull);
-        if (prop.layer == undefined) prop.layer = UILayer.UI_PopWindow;
-        if (prop.sizeMode == undefined) {
-            switch (prop.layer) {
-                case UILayer.UI_PopWindow:
-                    break;
-                default:
-                    prop.sizeMode = 0;
-            }
-        }
-        if (prop.mask == undefined) {
-            if (full) prop.mask = false;
-        }
-        if (prop.tweenEffect == undefined) prop.tweenEffect = !full;
-        if (prop.afterEffect == undefined) prop.afterEffect = true;
-        if (prop.clickout == undefined) prop.clickout = !full;
-    }
+    fillRegisterInfo(prop);
 
     ViewMgr.reg(prop);
 }
 
-export function fprop(classPrototype: any, p: string)
-export function fprop(prop: IFProp)
-export function fprop(param1?: any, param2?: any) {
-    if (param1 instanceof BaseComponent) {
-        fprop_helper({}, param1, param2);
-    } else {
-        return fprop_helper.bind(null, param1);
-    }
+export function fprop<T extends ViewDef.ViewComp>(classPrototype: T, propName: string);
+export function fprop(prop: IFProp);
+export function fprop(...args: any[]) {
+    if (xInstanceOf(args[0], BaseComponent) || xInstanceOf(args[0], FScript))
+        fprop_helper({}, args[0], args[1]);
+    else
+        return fprop_helper.bind(null, args[0] as IFProp);
 }
 
 export function fclass(classConstructor: Constructor<BaseComponent>)
@@ -148,24 +117,32 @@ export function fclass(param: any) {
     }
 }
 
-export function fctrl(classPrototype: any, p: string) {
+export function fscript(classConstructor: Constructor<FScript>)
+export function fscript(prop: IViewRegisterInfo)
+export function fscript(param: any) {
+    if ('function' === typeof param) {
+
+    }
+}
+
+export function fctrl<T extends ViewDef.ViewComp>(classPrototype: T, p: string) {
     fprop_helper({ ctrl: true }, classPrototype, p);
 }
 
-export function fanim(classPrototype: any, p: string) {
+export function fanim<T extends ViewDef.ViewComp>(classPrototype: T, p: string) {
     fprop_helper({ anim: true }, classPrototype, p);
 }
 
-export function ftype<T extends Component>(type: Constructor<T>) {
+export function ftype<T extends ViewDef.ViewComp>(type: Constructor<T>) {
     return fprop({ type });
 }
 
-export function fvirtual(classPrototype: any, p: string) {
+export function fvirtual<T extends ViewDef.ViewComp>(classPrototype: T, p: string) {
     fprop_helper({ virtual: true }, classPrototype, p);
 }
 
-export function flistRenderer<T extends Component>(type: Constructor<T>) {
-    return fprop({ itemRenderer: type });
+export function flistRenderer<T extends ViewDef.ViewComp>(type: Constructor<T>) {
+    return fprop({ list: { itemRenderer: type } })
 }
 
 export function floader<T extends Component>(type: Constructor<T>): any;
@@ -177,9 +154,25 @@ export function floader() {
     } else if (arguments.length > 2) {
         let packageName = arguments[1];
         let viewName = arguments[2];
-        return fprop({ loader: { type, packageName, viewName } });
+        return fprop({ loader: { type, packageName, itemName: viewName } });
     }
 }
+// export function floader<T extends BaseComponent|FScript>(option: {
+//     comp?: Constructor<BaseComponent>|(() => Constructor<BaseComponent>),
+//     compName?: string,
+//     script?: Constructor<FScript>|(() => Constructor<FScript>),
+//     scriptName?: string,
+//     /** 外部引用包名 */
+//     packageName?: string,
+//     /** 外部引用组件名 */
+//     itemName?: string
+// }) {
+//     const {
+//         comp, compName, script, scriptName, packageName, itemName
+//     } = option;
+//     if (!comp && !compName && !script && !scriptName)
+//         throw new Error();
+// }
 
 export function fname(name: string) {
     return fprop({ name })
@@ -218,11 +211,6 @@ export function fcomp() {
     }
 }
 
-// export function fcacheMode(cacheMode: Label.CacheMode) {
-//     //@ts-ignore
-//     return fprop({ cacheMode, initHandle: textCacheMode });
-// }
-
 export function ftextChar(classPrototype: any, p: string) {
     fprop_helper({ cacheMode: Label.CacheMode.CHAR, initHandle: textCacheMode }, classPrototype, p);
 }
@@ -239,12 +227,12 @@ export function frichBitMap(classPrototype: any, p: string) {
     fprop_helper({ cacheMode: Label.CacheMode.BITMAP, initHandle: richtextCacheMode }, classPrototype, p);
 }
 
-export function fbatch(clazz: any, p: string) {
-    fprop_helper({ batch: true }, clazz, p);
+export function fbatch(classPrototype: any, p: string) {
+    fprop_helper({ batch: true }, classPrototype, p);
 }
 
-export function fPreventBatch(clazz: any, p: string) {
-    fprop_helper({ preventBatch: true }, clazz, p);
+export function fPreventBatch(classPrototype: any, p: string) {
+    fprop_helper({ preventBatch: true }, classPrototype, p);
 }
 
 export function fmixin(baseCtors: Constructor[]) {
@@ -285,5 +273,44 @@ function richtextCacheMode(this: BaseComponent, textField: fgui.GRichTextField, 
     if (prop.cacheMode == Label.CacheMode.CHAR) {
         if (textField._label.outlineWidth > 0)
             label.spacingX -= textField._label.outlineWidth;
+    }
+}
+
+function fillRegisterInfo(info: IViewRegisterInfo) {
+    if (info.border) {
+        if (info.layer == void 0)
+            info.layer = UILayer.UI_Main;
+        if (info.sizeMode == void 0)
+            info.sizeMode = 0;
+        if (info.mask == void 0)
+            info.mask = false;
+        if (info.tweenEffect == void 0)
+            info.tweenEffect = false;
+        if (info.afterEffect == void 0)
+            info.afterEffect = false;
+        if (info.clickout == void 0)
+            info.clickout = false;
+    } else {
+        const full = (info.sizeMode === kUiSize.full) || (info.sizeMode === kUiSize.mixFull);
+        if (info.layer == void 0)
+            info.layer = UILayer.UI_PopWindow;
+        if (info.sizeMode == void 0) {
+            switch (info.layer) {
+                case UILayer.UI_PopWindow:
+                    break;
+                default:
+                    info.sizeMode = 0;
+            }
+        }
+        if (info.mask == void 0) {
+            if (full)
+                info.mask = false;
+        }
+        if (info.tweenEffect == void 0)
+            info.tweenEffect = !full;
+        if (info.afterEffect == void 0)
+            info.afterEffect = true;
+        if (info.clickout == void 0)
+            info.clickout = !full;
     }
 }

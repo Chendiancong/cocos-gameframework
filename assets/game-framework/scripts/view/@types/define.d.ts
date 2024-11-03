@@ -23,7 +23,7 @@ declare enum kUiParam {
 declare interface IViewRegisterInfo {
     id?: number;
     /** 类型 */
-    clazz?: import("cc").Constructor<import("../BaseWin").BaseWin>;
+    clazz?: Constructor<ViewDef.ViewComp>;
     /** 层级 */
     layer?: import("../LayerMgr").UILayer;
     /** 包名 */
@@ -56,8 +56,6 @@ declare interface IViewRegisterInfo {
     maskIgnore?: boolean;
     /** 透明界面（忽略隐藏逻辑） */
     lucency?: boolean;
-    /** 是否特殊界面，如loading,waitUI,... */
-    special?: boolean;
 }
 
 declare interface IFProp {
@@ -66,16 +64,23 @@ declare interface IFProp {
     names?: string[];
     /** FGUI元件路径*/
     path?: string;
+    /** 属性类型*/
+    type?: Constructor<ViewDef.ViewComp>;
     /** 子组件*/
-    type?: import("cc").Constructor<import("cc").Component>;
-    /** 子组件*/
-    comp?: { comp: import("cc").Constructor<import("cc").Component>, params?: { [x: string]: any }, loader?: boolean }[];
-    /** 虚列表*/
-    virtual?: boolean;
-    /** 列表项组件*/
-    itemRenderer?: import("cc").Constructor<import("cc").Component>;
+    comp?: { comp: Constructor<ViewDef.ViewComp>, params?: { [x: string]: any }, loader?: boolean }[];
+    /** 列表 */
+    list?: {
+        /** 虚列表 */
+        virtual?: boolean;
+        /** 列表项组件 */
+        itemRenderer?: Constructor<ViewDef.ViewComp>;
+    },
     /** 装载器*/
-    loader?: { type: import("cc").Constructor<import("cc").Component>, packageName?: string, viewName?: string };
+    loader?: {
+        type: Constructor<ViewDef.ViewComp>,
+        packageName?: string,
+        itemName?: string
+    }
     /** 控制器*/
     ctrl?: boolean;
     /** 动画 */
@@ -91,5 +96,9 @@ declare interface IFProp {
 
     [x: string]: any;
 
-    initHandle?: (this: import("../BaseComponent").BaseComponent, component: any, prop: IFProp) => void;
+    initHandle?: (this: ViewDef.ViewComp, component: any, prop: IFProp) => void;
+}
+
+declare namespace ViewDef {
+    type ViewComp = import('../BaseComponent').BaseComponent|import('../FScript').FScript;
 }
