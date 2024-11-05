@@ -113,19 +113,6 @@ declare namespace gFramework {
     export const cryptoJs: any;
     export const uiCamera: import('cc').Camera;
 
-    // export function showTips(message: any): void;
-    // export function showItemTips(info: any, v2?: any, type?: number): void;
-    // export function showEquipTips(info: any, v2?: any, type?: number): void;
-    // export function showFaBaoTips(info: { fabaoId: number }, v2?: any): void;
-    // export function showDescTips(info: any, v2?: any): void;
-    // export function hideDescTips(): void;
-    // export function showSpineEff(info: any, v2?: any): void;
-    // export function showAnnounce(message: any, times?: number): void;
-    // export function showShili(preV:number, toV: number): void;
-    // export function showFloatAwardEff(info: any, cnt: number, fromV: any, toV: any, isJudege?: boolean): void;
-    // export function showAddAwardEff(info: any, fromV: any, extraInfo?: any): void;
-    // export function showPartnerTip(partner,vec2):void
-
     export function log(message: any, ...args: any[]): void;
     export function forceLog(message: any, ...args: any[]): void;
     export function warn(message: any, ...args: any[]): void;

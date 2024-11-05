@@ -1,20 +1,19 @@
 import { UILayer } from "./LayerMgr";
-import { fgui } from "../base/base";
 import { EventTarget, Rect, js } from "cc";
-import { BaseWin } from "./BaseWin";
+import { BaseWin, IBaseWin } from "./BaseWin";
 import { BaseComponent } from "./BaseComponent";
 import { createViewCtrl, ViewCtrl } from "./ViewCtrl";
 import { CustomEvent } from "../events/Event";
 import { DEBUG } from "cc/env";
-import { GObject, GObjectPool } from "fairygui-cc";
+import { GComponent, GObject, GObjectPool, GRoot, RelationType, UIPackage } from "fairygui-cc";
 import { ITimerHandler, timerCenter } from "../timer/TimerCenter";
 
 const _offWidth: number = 80;
 const _offHight: number = 160;
 
-type OpenKey = number | string | BaseWin | Constructor<BaseWin>;
-type CtrlKey = string | BaseWin;
-type WinOpenParams<T extends BaseWin> = T extends { open(params: infer R) } ? R : any;
+type OpenKey = number | string | IBaseWin | Constructor<IBaseWin>;
+type CtrlKey = string | IBaseWin;
+type WinOpenParams<T extends IBaseWin> = T extends { open(params: infer R) } ? R : any;
 
 export class ViewBuilder {
     openKey: string;
@@ -34,16 +33,17 @@ export class ViewBuilder {
     }
 
     setSource(source: BaseComponent) {
-        if (!source) {
-            this.sourceCtrlKey = null;
-            return this;
-        }
-        if (!(source instanceof BaseWin)) {
-            source = source.getParentBaseWin();
-        }
-        this.info.layer = (source as BaseWin).viewCtrl.layer;
-        this.sourceCtrlKey = (source as BaseWin).ctrlKey;
-        return this;
+        // if (!source) {
+        //     this.sourceCtrlKey = null;
+        //     return this;
+        // }
+        // if (!(source instanceof BaseWin)) {
+        //     source = source.getParentBaseWin();
+        // }
+        // this.info.layer = (source as BaseWin).viewCtrl.layer;
+        // this.sourceCtrlKey = (source as BaseWin).ctrlKey;
+        // return this;
+        throw new Error();
     }
 
     setClickout(value: boolean) {
@@ -67,8 +67,8 @@ export class ViewBuilder {
 }
 
 export class ViewMgr extends EventTarget {
-    public mask: fgui.GComponent;
-    public wait: fgui.GComponent;
+    public mask: GComponent;
+    public wait: GComponent;
     readonly kPoolItemKey = '$gPoolItem';
 
     private static _regInfo: { [key: string]: IViewRegisterInfo } = {};
@@ -121,10 +121,10 @@ export class ViewMgr extends EventTarget {
         return key;
     }
 
-    public getView<T extends BaseWin>(ctor: Constructor<T>): T;
-    public getView(ctrlKey: string): BaseWin;
-    public getView(openKey: OpenKey): BaseWin;
-    public getView(key: any): BaseWin {
+    public getView<T extends IBaseWin>(ctor: Constructor<T>): T;
+    public getView(ctrlKey: string): IBaseWin;
+    public getView(openKey: OpenKey): IBaseWin;
+    public getView(key: any): IBaseWin {
         return this.getViewCtrl(key)?.view;
     }
 
@@ -168,7 +168,7 @@ export class ViewMgr extends EventTarget {
         }
     }
 
-    public setMask(mask: fgui.GComponent) {
+    public setMask(mask: GComponent) {
         if (this.mask != null) {
             this.mask.dispose();
         }
@@ -178,7 +178,7 @@ export class ViewMgr extends EventTarget {
             if (this.tweening) {
                 if (DEBUG) {
                     const top = this.getTopViewCtrl();
-                    console.log("reject too fast to close the " + top.view.name + " UI");
+                    console.log("reject too fast to close the " + top.view.clazz.name + " UI");
                 }
                 return;
             }
@@ -192,7 +192,7 @@ export class ViewMgr extends EventTarget {
             else
                 top.close();
         });
-        mask.addRelation(fgui.GRoot.inst, fgui.RelationType.Size);
+        mask.addRelation(GRoot.inst, RelationType.Size);
         this.mask = mask;
     }
 
@@ -245,16 +245,16 @@ export class ViewMgr extends EventTarget {
         return builder;
     }
 
-    public openx<T extends BaseWin>(ctor: Constructor<T>, params?: WinOpenParams<T>, fromKey?: string): Promise<T> {
+    public openx<T extends IBaseWin>(ctor: Constructor<T>, params?: WinOpenParams<T>, fromKey?: string): Promise<T> {
         return this.open(ctor, params, fromKey);
     }
 
-    public open<T extends BaseWin>(ctor: Constructor<T>, params?: WinOpenParams<T>, fromKey?: string): Promise<T>;
-    public open<T extends BaseWin>(instance: T, params?: any, fromKey?: string): Promise<T>;
-    public open<T extends BaseWin>(className: string, params?: any, fromKey?: string): Promise<T>;
-    public open<T extends BaseWin>(viewId: number, params?: any, fromKey?: string): Promise<T>;
-    public open<T extends BaseWin>(openKey: OpenKey, params?: any, fromKey?: string): Promise<T>;
-    public open<T extends BaseWin = BaseWin>(openKey: any, params?: any, fromKey?: string): Promise<T> {
+    public open<T extends IBaseWin>(ctor: Constructor<T>, params?: WinOpenParams<T>, fromKey?: string): Promise<T>;
+    public open<T extends IBaseWin>(instance: T, params?: any, fromKey?: string): Promise<T>;
+    public open<T extends IBaseWin>(className: string, params?: any, fromKey?: string): Promise<T>;
+    public open<T extends IBaseWin>(viewId: number, params?: any, fromKey?: string): Promise<T>;
+    public open<T extends IBaseWin>(openKey: OpenKey, params?: any, fromKey?: string): Promise<T>;
+    public open<T extends IBaseWin = IBaseWin>(openKey: any, params?: any, fromKey?: string): Promise<T> {
         if (!this.canShow(openKey, params, true)) {
             return Promise.resolve(null);
         }
@@ -264,7 +264,7 @@ export class ViewMgr extends EventTarget {
     }
 
     public close(ctrlKey: string): void;
-    public close<T extends BaseWin>(ctor: Constructor<T>): void;
+    public close<T extends IBaseWin>(ctor: Constructor<T>): void;
     public close(openKey: OpenKey): void;
     public close(key: any) {
         key = this.ctrlKeyOf(key);
@@ -334,18 +334,8 @@ export class ViewMgr extends EventTarget {
     _onLoad(ctrl: ViewCtrl) {
         if (!!this._timer) timerCenter.removeObjSchedule(this);
         if (ctrl.sizeMode !== kUiSize.mixFull) {
-            if (ctrl.isSpecial) {
-                this._timer = timerCenter.doDelay(500, () => {
-                    if (ctrl && ctrl.isValid) {
-                        this._updateVisible(ctrl, null);
-                        this._updateMask();
-                    }
-                    this._timer = void 0;
-                }, this);
-            } else {
-                this._updateVisible(ctrl, null);
-                this._updateMask();
-            }
+            this._updateVisible(ctrl, null);
+            this._updateMask();
         } else {
             this._timer = timerCenter.doDelay(300, () => {
                 if (ctrl && ctrl.isValid) {
@@ -533,29 +523,29 @@ export class ViewMgr extends EventTarget {
         }
     }
 
-    public createComponent<T extends BaseComponent>(ctor: Constructor<T>, packName: string, viewName: string): T {
-        let obj: fgui.GObject;
-        obj = fgui.UIPackage.createObject(packName, viewName);
-        obj.ccRenderer = ctor;
+    public createComponent<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompType<T>, packName: string, viewName: string): T {
+        let obj: GObject;
+        obj = UIPackage.createObject(packName, viewName);
+        obj.ccRenderer = ctor.convertAsComponent();
         return obj.ccRender as T;
     }
 
-    public createComponentFromPool<T extends BaseComponent>(ctor: Constructor<T>, packName: string, viewName: string, pool?: GObjectPool) {
-        const obj: fgui.GObject = this.createObjectFromPool(packName, viewName, pool);
+    public createComponentFromPool<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompType<T>, packName: string, viewName: string, pool?: GObjectPool) {
+        const obj: GObject = this.createObjectFromPool(packName, viewName, pool);
         if (obj)
-            obj.ccRenderer = ctor;
+            obj.ccRenderer = ctor.convertAsComponent();
         return obj.ccRender as T;
     }
 
-    public returnComponent<T extends BaseComponent>(comp: T, pool?: GObjectPool) {
-        const obj = comp.fobj;
-        if (obj)
-            this.returnObject(obj, pool);
+    public returnComponent<T extends ViewDef.ViewComp>(comp: T, pool?: GObjectPool) {
+        const fobj = comp.fobj;
+        if (fobj)
+            this.returnObject(fobj, pool);
     }
 
     public createObject(packName: string, viewName: string) {
-        let obj: fgui.GObject;
-        obj = fgui.UIPackage.createObject(packName, viewName);
+        let obj: GObject;
+        obj = UIPackage.createObject(packName, viewName);
         return obj;
     }
 
@@ -577,11 +567,11 @@ export class ViewMgr extends EventTarget {
     }
 
     public getCheckItemUrl(packName: string, viewName: string) {
-        return fgui.UIPackage.getItemURL(packName, viewName);
+        return UIPackage.getItemURL(packName, viewName);
     }
 
     public getItemURL(packName: string, viewName: string) {
-        const url = fgui.UIPackage.getItemURL(packName, viewName);
+        const url = UIPackage.getItemURL(packName, viewName);
         gFramework.assert(!!url, packName + "包里不存在" + viewName);
         return url;
     }

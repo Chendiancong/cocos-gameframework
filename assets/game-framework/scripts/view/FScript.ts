@@ -1,21 +1,25 @@
-import { __private, Prefab } from "cc";
 import { BaseComponent } from "./BaseComponent";
 import { observerable, ObserverClass } from "../events/ObserverClass";
 import { GComponent } from "fairygui-cc";
 import { FPropHandleContext, fpropUtil } from "./FPropUtil";
-import { isExtends } from "../base/jsUtil";
+import { IBaseWin } from "./BaseWin";
+import { CommonWin } from "./CommonWin";
+import { getGlobal } from "../base/base";
 
 export interface FScript<T = any> extends ObserverClass {}
 
 @observerable
-export class FScript<T = any> {
-    private _propsInited: boolean;
-    private _component: FScriptComponent<T>;
+export class FScript<T = any> implements ObserverClass, ViewDef.ViewComp<T> {
+    protected _propsInited: boolean;
+    protected _component: FScriptComponent<T>;
 
-    get clazz() { return this.constructor as Constructor<FScript<T>>; }
-
+    get node() { return this._component?.node; }
+    get fobj() { return this._component?.fobj; }
+    get fcom() { return this._component?.fcom; }
     get propsInited() { return this._propsInited; }
+    get observeWhenEnable() { return false; }
     get component() { return this._component; }
+    get clazz() { return this.constructor as Constructor<FScript<T>> }
 
     get data() { return this._component?.data; }
     set data(v: T) {
@@ -29,8 +33,38 @@ export class FScript<T = any> {
             this._component.selected = v;
     }
 
-    get fobj() { return this._component?.fobj; }
-    get fcom() { return this._component?.fcom; }
+    get visible() { return this._component?.visible; }
+    set visible(flag: boolean) {
+        if (this._component?.isValid)
+            this._component.visible = flag;
+    }
+
+    static convertAsWin(): Constructor<BaseComponent> {
+        throw new Error();
+    }
+
+    static convertAsComponent(): Constructor<BaseComponent> {
+        const key = '$fscriptcomp';
+        const desc = Object.getOwnPropertyDescriptor(this, key);
+        if (desc)
+            return desc.get.call(this);
+        const that = this;
+        const clazz = class AnonymousFScriptComponent extends FScriptComponent {
+            static readonly kClassName = `FScriptComponent_${this.name}`;
+
+            __preload(): void {
+                super.__preload && super.__preload.call(this, ...arguments);
+                this.fscript = new that();
+            }
+        }
+        Object.defineProperty(this, key, {
+            get() { return clazz; },
+            configurable: false,
+            enumerable: true,
+        });
+
+        return clazz;
+    }
 
     static initProp<TScript extends FScript>(instance: TScript, clazz: Constructor<TScript>) {
         if (instance._propsInited)
@@ -71,12 +105,20 @@ export class FScript<T = any> {
 
     reconnect?(): void;
 
+    dispose(destroy: boolean) {
+        this._component?.dispose(destroy);
+    }
+
     initProp() {
-        return FScript.initProp(this, this.clazz);
+        FScript.initProp(this, this.clazz);
     }
 
     getChild(name: string) {
         return this._component?.getChild(name);
+    }
+
+    getViewCompsInChildren() {
+        return this.component?.getComponentsInChildren(FScriptComponent).map(v => v.fscript) ?? [];
     }
 
     protected selectChanged(selected: boolean) { }
@@ -84,6 +126,64 @@ export class FScript<T = any> {
     protected dataChanged(data: T) {}
 
     protected onDispose() { }
+}
+
+@observerable
+export class FScriptWin extends FScript<any> implements IBaseWin {
+    openKey: string;
+    ctrlKey: string;
+    fromKey?: string;
+
+    get viewCtrl() {
+        return gFramework.viewMgr.getViewCtrl(this.ctrlKey);
+    }
+    get viewInfo() {
+        return this.viewCtrl?.info;
+    }
+    get source() {
+        const ctrlKey = this.viewCtrl.sourceCtrlKey;
+        if (ctrlKey)
+            return gFramework.viewMgr.getViewCtrl(ctrlKey);
+    }
+
+    static convertAsWin(): Constructor<BaseComponent> {
+        const key = '$fscriptwincomp';
+        const desc = Object.getOwnPropertyDescriptor(this, key);
+        if (desc)
+            return desc.get.call(this);
+        const that = this;
+        const clazz = class AnonymousFScriptWinComponent extends FScriptComponent {
+            static readonly kClassName = `FScriptWinComponent_${that.name}`
+
+            __preload(): void {
+                super.__preload && super.__preload.call(this, ...arguments);
+                this.fscript = new that();
+            }
+        }
+        Object.defineProperty(this, key, {
+            get() { return clazz; },
+            configurable: false,
+            enumerable: true
+        });
+
+        return clazz;
+    }
+
+    static convertAsComponent(): Constructor<BaseComponent> {
+        throw new Error();
+    }
+
+    delayOnLoad?(): void;
+
+    setWinTitle(title: string) {
+        const commonWin = this.component?.getComponent(CommonWin);
+        if (commonWin?.isValid)
+            commonWin.winTitle.text = title;
+    }
+
+    closeSelf() {
+        gFramework.viewMgr.close(this)
+    }
 }
 
 export class FScriptComponent<T = any> extends BaseComponent<T> {
@@ -109,6 +209,14 @@ export class FScriptComponent<T = any> extends BaseComponent<T> {
         this._fscript?.reconnect && this._fscript.reconnect();
     }
 
+    initProp() {
+        super.initProp();
+        this._fscript?.initProp();
+    }
+
+    /**
+     * @deprecated legacy
+     */
     legacyInitProp(instance: BaseComponent, clazz: Constructor<BaseComponent>): void {
         if (this.propsInited)
             return;
@@ -128,23 +236,23 @@ export class FScriptComponent<T = any> extends BaseComponent<T> {
         this._fscript && this._fscript['onDispose']();
     }
 
-    static createClassWithFScript(type: Constructor<FScript>) {
+    static createAnonymousClass(type: Constructor<FScript>) {
         const key = '$fscriptComp';
-        return type[key] ??
-            (type[key] = class extends FScriptComponent {
-                __preload(): void {
-                    super.__preload && super.__preload.call(this, ...arguments);
-                    this.fscript = new type();
-                }
-            });
+        if (type[key])
+            return type[key];
+        const clazz = class AnonymousFScriptComponent extends FScriptComponent {
+            static classType = `FScriptComponent_${type.name}`;
+
+            __preload(): void {
+                super.__preload && super.__preload.call(this, ...arguments);
+                this.fscript = new type();
+            }
+        };
+        type[key] = clazz;
+        return type[key];
     }
 }
 
-fpropUtil.setCompSetupHandler({
-    onConvertComponent(type: Constructor<ViewDef.ViewComp>) {
-        if (isExtends(type, FScript))
-            return FScriptComponent.createClassWithFScript(type as Constructor<FScript>);
-        else
-            return void 0;
-    },
-})
+getGlobal().FScript = FScript;
+getGlobal().FScriptWin = FScriptWin;
+getGlobal().FScriptComponent = FScriptComponent;

@@ -3,13 +3,11 @@ import { fgui } from "../base/base";
 import { defer } from "../base/promise";
 import { getOrAddComponent } from "../utils/util";
 import { BaseComponent } from "./BaseComponent";
-import { BaseWin } from "./BaseWin";
+import { BaseWin, IBaseWin } from "./BaseWin";
 import { addTask } from "./TaskMgr";
 import { DEBUG } from "cc/env";
 import { MyEvent } from "fairygui-cc";
 import { ViewBetween } from "./ViewBetween";
-import { isExtends, xInstanceOf } from "../base/jsUtil";
-import { FScript, FScriptComponent } from "./FScript";
 import { fpropUtil } from "./FPropUtil";
 
 const { ccclass } = _decorator;
@@ -74,8 +72,8 @@ export class ViewCtrl extends Component {
     params: any;
     sourceCtrlKey: string;
 
-    view: BaseWin;
-    private _aview: Promise<BaseWin>;
+    view: IBaseWin;
+    private _aview: Promise<IBaseWin>;
     private _deferer: any;
     private _show: boolean = true;
     private _viewPos: Vec2;
@@ -241,7 +239,7 @@ export class ViewCtrl extends Component {
 
     isClose() { return this._state === kViewState.Closed; }
 
-    isViewOf(cls: Constructor<BaseWin>) {
+    isViewOf(cls: Constructor<IBaseWin>) {
         return this.openKey == js.getClassName(cls);
     }
 
@@ -306,7 +304,7 @@ export class ViewCtrl extends Component {
         let view = this.view;
         if (view) {
             if (state === kViewState.Opened) {
-                const onClose: (view: BaseWin) => void = this.params?.onClose;
+                const onClose: (view: IBaseWin) => void = this.params?.onClose;
                 if (typeof onClose === 'function')
                     onClose.call(this, view);
                 if (view.close)
@@ -314,7 +312,7 @@ export class ViewCtrl extends Component {
             }
 
             view.dispose(false);
-            let comps = view.getComponentsInChildren(BaseComponent);
+            const comps = view.getViewCompsInChildren();
             for (let i = 0, il = comps.length, comp; i < il; i++) {
                 comp = comps[i];
                 if (comp !== view) {
@@ -426,8 +424,8 @@ export class ViewCtrl extends Component {
     private _lagacyCreateView(fgui: fgui.GComponent) {
         let openKey = this.openKey,
             info = this.info;
-        let view: BaseWin;
-        view = fgui.node.addComponent(info.clazz as Constructor<BaseWin>);
+        let view: IBaseWin;
+        view = fgui.node.addComponent(info.clazz.convertAsWin()) as ViewDef.ViewComp as IBaseWin
         view.openKey = openKey;
         view.ctrlKey = this.ctrlKey;
         view.fromKey = this.fromKey;
@@ -437,14 +435,8 @@ export class ViewCtrl extends Component {
     private _createView(fgui: fgui.GComponent) {
         const openKey = this.openKey,
             info = this.info;
-        let view: BaseWin;
-        const clazz = fpropUtil.confirmType(info.clazz);
-        if (isExtends(clazz, BaseWin))
-            view = fgui.node.addComponent(clazz as Constructor<BaseWin>);
-        else {
-            view = fgui.node.addComponent(BaseWin);
-            fgui.node.addComponent(clazz);
-        }
+        let view: IBaseWin;
+        view = fgui.node.addComponent(info.clazz.convertAsWin()) as ViewDef.ViewComp as IBaseWin;
         view.openKey = openKey;
         view.ctrlKey = this.ctrlKey;
         view.fromKey = this.fromKey;
@@ -452,15 +444,22 @@ export class ViewCtrl extends Component {
     }
 
     private _initView() {
-        let view: BaseWin,
+        let view: IBaseWin,
             widgets = this.widgets,
             info = this.info;
         view = this.view;
-        view.legacyInitProp(view, info.clazz);
+        // view.legacyInitProp(view, info.clazz);
+        // if (widgets) {
+        //     for (let i = 0, il = widgets.length, comp; i < il; i++) {
+        //         comp = getOrAddComponent(view.node, widgets[i]);
+        //         view.legacyInitProp(comp, widgets[i]);
+        //     }
+        // }
+        view.initProp();
         if (widgets) {
-            for (let i = 0, il = widgets.length, comp; i < il; i++) {
-                comp = getOrAddComponent(view, widgets[i]);
-                view.legacyInitProp(comp, widgets[i]);
+            for (let i = 0, il = widgets.length; i < il; ++i) {
+                const comp = getOrAddComponent(view.node, widgets[i]);
+                comp.initProp();
             }
         }
     }
@@ -481,7 +480,7 @@ export class ViewCtrl extends Component {
 
         let openFn = view.open,
             params = this.params,
-            onOpenFn: (view: BaseWin) => void = params?.onOpen;
+            onOpenFn: (view: IBaseWin) => void = params?.onOpen;
         if (typeof openFn === "function") {
             openFn.call(view, params);
         }

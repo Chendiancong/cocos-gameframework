@@ -50,7 +50,7 @@ export function hasMixin<T, U>(target: T, baseCtor: Constructor<U>) {
 }
 
 export function isExtends<T, U>(target: Constructor<T>, base: Constructor<U>) {
-    return xInstanceOf(target.prototype, base);
+    return xInstanceOf(target?.prototype ?? void 0, base);
 }
 
 export function xInstanceOf<T>(target: T, baseCtorName: string): boolean;

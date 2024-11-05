@@ -1,3 +1,4 @@
+export * from './view-define';
 import { UILayer } from "./LayerMgr";
 import { Component, Constructor, js, Label, _decorator } from "cc";
 import { BaseComponent } from "./BaseComponent";
@@ -84,7 +85,7 @@ function fclass_helper(prop: IViewRegisterInfo, classConstructor: any) {
     }
 
     if (isExtends(classConstructor, BaseWin))
-        BaseWin.configBaseWinDelayOnLoad(classConstructor.prototype);
+        BaseWin.setupDelayOnLoad(classConstructor.prototype);
 
     let className = js.getClassName(classConstructor);
     if (prop.id == void 0) {
@@ -120,9 +121,10 @@ export function fclass(param: any) {
 export function fscript(classConstructor: Constructor<FScript>)
 export function fscript(prop: IViewRegisterInfo)
 export function fscript(param: any) {
-    if ('function' === typeof param) {
-
-    }
+    if ('function' === typeof param)
+        fclass_helper(void 0, param);
+    else
+        return fclass_helper.bind(void 0, param);
 }
 
 export function fctrl<T extends ViewDef.ViewComp>(classPrototype: T, p: string) {

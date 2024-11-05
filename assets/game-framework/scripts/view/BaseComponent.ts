@@ -1,6 +1,5 @@
-import * as fgui from 'fairygui-cc';
 import { Component, js, _decorator, Node } from "cc";
-import { applyMixins, isExtends } from "../base/jsUtil";
+import { applyMixins } from "../base/jsUtil";
 import { ObserverClass } from "../events/ObserverClass";
 import { fGetChild } from '../utils/fgui/futil';
 import { getOrAddComponent } from '../utils/util';
@@ -9,50 +8,26 @@ import { FPackage } from './FPackage';
 import { CustomEvent } from '../events/Event';
 import { NodeBatchable } from '../engine';
 import { ResKeeper } from '../res/ResKeeper';
-import { getGlobal } from '../base/base';
 import { FPropHandleContext, fpropUtil } from './FPropUtil';
+import { GComponent, GList, GLoader, GObject, UIPackage } from "fairygui-cc";
+import { getGlobal } from "../base/base";
 
 const { ccclass } = _decorator;
 
 export type ComponentData<T extends BaseComponent> = T extends BaseComponent<infer R> ? R : any;
 
 @ccclass('BaseComponent')
-export class BaseComponent<T = any> extends Component {
+export class BaseComponent<T = any> extends Component implements ViewDef.ViewComp<T> {
     _observed: any[] = [];
     _closed: boolean = false;
     private _dataDummy: boolean;
 
-    get fobj(): fgui.GObject {
+    get fobj(): GObject {
         return this.node && this.node["$gobj"];
     }
-    get fcom(): fgui.GComponent {
+    get fcom(): GComponent {
         return this.node && this.node["$gobj"];
     }
-
-    getChild(name: string) {
-        return fGetChild(this.fcom, name);
-    }
-
-    private _conditionIds: number[];
-    protected checkCondition?(id: number, bShowTips?: boolean): boolean {
-        if (id) {
-            if (!this._conditionIds) this._conditionIds = [];
-            if (!this._conditionIds.includes(id)) {
-                this._conditionIds.push(id);
-            }
-        }
-        return window["checkCondition"]?.(id, bShowTips);
-    }
-
-    protected get conditionIds() {
-        return this._conditionIds;
-    }
-
-    open?(params?: any): void;
-
-    close?(): void;
-
-    reconnect?(): void;
 
     protected _data?: T;
     public get data(): T {
@@ -80,6 +55,59 @@ export class BaseComponent<T = any> extends Component {
     private _propsInited: boolean = false;
     public get propsInited() { return this._propsInited; }
 
+    get isClose() {
+        return this._closed;
+    }
+
+    get visible() {
+        return this.fcom.visible;
+    }
+
+    set visible(val: boolean) {
+        this.fcom.visible = val;
+    }
+
+    get observeWhenEnable() { return true; }
+
+    get myObserveWhenEnable() {
+        return this.observeWhenEnable;
+    }
+
+    get clazz() { return this.constructor as Constructor<BaseComponent<T>>; }
+
+    static convertAsWin(): Constructor<BaseComponent> {
+        throw new Error();
+    }
+
+    static convertAsComponent(): Constructor<BaseComponent> {
+        return this;
+    }
+
+    getChild(name: string) {
+        return fGetChild(this.fcom, name);
+    }
+
+    private _conditionIds: number[];
+    protected checkCondition?(id: number, bShowTips?: boolean): boolean {
+        if (id) {
+            if (!this._conditionIds) this._conditionIds = [];
+            if (!this._conditionIds.includes(id)) {
+                this._conditionIds.push(id);
+            }
+        }
+        return window["checkCondition"]?.(id, bShowTips);
+    }
+
+    protected get conditionIds() {
+        return this._conditionIds;
+    }
+
+    open?(params?: any): void;
+
+    close?(): void;
+
+    reconnect?(): void;
+
     private _dataChanged(data: any): void {
         this.data = data;
     }
@@ -101,10 +129,6 @@ export class BaseComponent<T = any> extends Component {
 
     protected dataChanged(data: any): void { }
 
-    protected get observeWhenEnable() { return true; }
-
-    get myObserveWhenEnable() { return this.observeWhenEnable; }
-
     static initProp<T extends BaseComponent>(instance: T, clazz: Constructor<T>) {
         if (instance._propsInited)
             return;
@@ -113,7 +137,7 @@ export class BaseComponent<T = any> extends Component {
         instance.node.on(CustomEvent.DATA_CHANGE, instance._dataChanged, instance);
         instance.node.on(CustomEvent.ITEM_SELECT, instance._onItemSelect, instance);
 
-        let fcom: fgui.GComponent;
+        let fcom: GComponent;
         if (!(fcom = instance.fcom))
             return;
 
@@ -121,7 +145,7 @@ export class BaseComponent<T = any> extends Component {
             return;
 
         const fprops = clazz['_fprops'] as Record<string, IFProp>;
-        if (!fprops || !(fcom instanceof fgui.GComponent))
+        if (!fprops || !(fcom instanceof GComponent))
             return;
 
         let pkgId: string, itemId: string;
@@ -257,27 +281,15 @@ export class BaseComponent<T = any> extends Component {
         } while (selfNode);
     }
 
-    isClose() {
-        return this._closed;
-    }
-
-    get visible() {
-        return this.isVisible();
-    }
-
-    set visible(val: boolean) {
-        this.setVisible(val);
-    }
-
-    isVisible() {
-        return this.fcom.visible;
-    }
-
-    setVisible(value: boolean) {
-        this.fcom.visible = value;
-    }
-
     closePopup: () => void;
+
+    initProp() {
+        BaseComponent.initProp(this, this.clazz);
+    }
+
+    getViewCompsInChildren() {
+        return this.getComponentsInChildren(BaseComponent);
+    }
 
     /**
      * @deprecated legacy
@@ -290,7 +302,7 @@ export class BaseComponent<T = any> extends Component {
         instance.node.on(CustomEvent.DATA_CHANGE, instance._dataChanged, instance);
         instance.node.on(CustomEvent.ITEM_SELECT, instance._onItemSelect, instance);
 
-        let fcom: fgui.GComponent;
+        let fcom: GComponent;
         if (!(fcom = instance.fcom))
             return;
 
@@ -298,7 +310,7 @@ export class BaseComponent<T = any> extends Component {
             return;
 
         const fprops = clazz["_fprops"];
-        if (!fprops || !(fcom instanceof fgui.GComponent))
+        if (!fprops || !(fcom instanceof GComponent))
             return;
 
         let pkgId: string, itemId: string;
@@ -326,7 +338,7 @@ export class BaseComponent<T = any> extends Component {
                 continue;
             }
 
-            let fchild: fgui.GObject;
+            let fchild: GObject;
             if (!!fprop.names) { // 按名字列表获取属性
                 fchild = fcom.getChildByNames(fprop.names);
             }
@@ -378,11 +390,10 @@ export class BaseComponent<T = any> extends Component {
 
             if (!!fprop.batch) {
                 let node = fchild.node;
-                if (fchild instanceof fgui.GList) {
+                if (fchild instanceof GList) {
                     node = fchild._container;
                 }
                 if (node) getOrAddComponent(node, NodeBatchable);
-                ///if (node) setBatch(node);
             }
 
             if (!!fprop.preventBatch) {
@@ -390,7 +401,7 @@ export class BaseComponent<T = any> extends Component {
                 NodeBatchable.setPreventBatchNode(node);
             }
 
-            if (fprop.loader && (fchild instanceof fgui.GLoader)) {
+            if (fprop.loader && (fchild instanceof GLoader)) {
                 let loader = fprop.loader;
                 let packageName = loader.packageName;
                 let viewName = loader.itemName;
@@ -398,10 +409,10 @@ export class BaseComponent<T = any> extends Component {
                 fchild.componentRender = true;
                 fpropUtil.setCCRenderer(fchild, loader.type);
                 if (packageName && viewName) {
-                    if (fgui.UIPackage.getByName(packageName)) {
+                    if (UIPackage.getByName(packageName)) {
                         ResKeeper.register(
                             fchild.node,
-                            fgui.UIPackage.getByName(packageName),
+                            UIPackage.getByName(packageName),
                             getOrAddComponent(fchild.node, ResKeeper)
                         )
                         fchild.url = gFramework.viewMgr.getItemURL(packageName, viewName);
@@ -410,7 +421,7 @@ export class BaseComponent<T = any> extends Component {
                         let pkg = getOrAddComponent(fchild.node, FPackage);
                         pkg.packageName = packageName;
                         pkg.node.once(FPackage.EventType.loaded, function () {
-                            (fchild as fgui.GLoader).url = gFramework.viewMgr.getItemURL(packageName, viewName);
+                            (fchild as GLoader).url = gFramework.viewMgr.getItemURL(packageName, viewName);
                         }, instance);
                     }
                 }
@@ -424,16 +435,16 @@ export class BaseComponent<T = any> extends Component {
                 }
             } else {
                 if (!!fprop.comp) {
-                    const isAsync = fchild instanceof fgui.GComponent && fchild.isJobConstruct;
+                    const isAsync = fchild instanceof GComponent && fchild.isJobConstruct;
                     for (let e of fprop.comp) {
                         if (isAsync)
-                            fpropUtil.addAsyncComponentRenderer(fchild as fgui.GComponent, e.comp, e.params);
+                            fpropUtil.addAsyncComponentRenderer(fchild as GComponent, e.comp, e.params);
                         else
                             fpropUtil.addRenderer(fchild, e.comp, e.params);
                     }
                 }
 
-                if (fprop.list && fchild instanceof fgui.GList) {
+                if (fprop.list && fchild instanceof GList) {
                     const list = fprop.list;
                     if (list.virtual)
                         fchild.setVirtual();
@@ -452,11 +463,4 @@ export interface BaseComponent extends ObserverClass { }
 
 applyMixins(BaseComponent, [ObserverClass]);
 
-fpropUtil.setCompSetupHandler({
-    onConvertComponent(type: Constructor<ViewDef.ViewComp>) {
-        if (isExtends(type, BaseComponent))
-            return BaseComponent;
-        else
-            return void 0;
-    }
-})
+getGlobal().BaseComponent = BaseComponent;

@@ -2,18 +2,33 @@ import { _decorator, Component } from "cc";
 import { fgui } from "../base/base";
 import { BaseComponent } from "./BaseComponent";
 import { CommonWin } from "./CommonWin";
+import type { ViewCtrl } from "./ViewCtrl";
 
 const { ccclass } = _decorator;
 
-@ccclass('BaseWin')
-export class BaseWin extends BaseComponent {
+export interface IBaseWin extends ViewDef.ViewComp {
     openKey: string;
     ctrlKey: string;
     fromKey?: string;
 
-    delayOnLoad?: () => void;
+    get observeWhenEnable(): boolean;
+    get viewCtrl(): ViewCtrl;
+    get viewInfo(): IViewRegisterInfo;
+    get source(): ViewCtrl;
 
-    protected get observeWhenEnable() { return false; }
+    setWinTitle(title: string): void;
+    closeSelf(): void;
+
+    delayOnLoad?(): void;
+}
+
+@ccclass('BaseWin')
+export class BaseWin extends BaseComponent implements IBaseWin {
+    openKey: string;
+    ctrlKey: string;
+    fromKey?: string;
+
+    get observeWhenEnable() { return false; }
 
     get viewCtrl() {
         return gFramework.viewMgr.getViewCtrl(this.ctrlKey);
@@ -37,19 +52,25 @@ export class BaseWin extends BaseComponent {
         this.getComponent(CommonWin).winTitle.text = title;
     }
 
-    setWinTitleIcon(urlKey: string) {
-        this.getComponent(CommonWin).setWinTitleIcon(urlKey);
-    }
-
     closeSelf() {
         gFramework.viewMgr.close(this);
+    }
+
+    delayOnLoad?: () => void;
+
+    static convertAsWin() {
+        return this;
+    }
+
+    static convertAsComponent(): Constructor<BaseComponent> {
+        throw new Error();
     }
 
     static checkOpen?(params?: any, showTips?: boolean) {
         return true;
     }
 
-    static configBaseWinDelayOnLoad(clazzProtoOrIns: Component) {
+    static setupDelayOnLoad(clazzProtoOrIns: Component) {
         const delayOnLoad = clazzProtoOrIns['onLoad'];
         if (delayOnLoad) {
             clazzProtoOrIns['onLoad'] = doNothing;

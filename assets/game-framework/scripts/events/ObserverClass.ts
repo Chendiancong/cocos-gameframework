@@ -1,6 +1,5 @@
 import { autoProperty } from "../base/base-decorator";
 import { applyMixins } from "../base/jsUtil";
-import type { BaseComponent } from "../view/BaseComponent";
 import { MessageCenter } from "./MessageCenter";
 
 export class ObserverClass {
@@ -14,15 +13,15 @@ export class ObserverClass {
             let res: any;
             let isNeedCall = true;
             let resultCall = () => handleFunc.apply(thiz, arguments);
-            if (!!thiz && thiz.constructor.name === 'BaseComponent') {
-                const baseComp = thiz as any as BaseComponent;
-                if (baseComp.myObserveWhenEnable) {
-                    if (!baseComp.enabledInHierarchy) {
-                        baseComp.addEnableApplyOnce(handleFunc, arguments);
-                        isNeedCall = false;
-                    }
-                }
-            }
+            // if (!!thiz && thiz.constructor.name === 'BaseComponent') {
+            //     const baseComp = thiz as any as BaseComponent;
+            //     if (baseComp.myObserveWhenEnable) {
+            //         if (!baseComp.enabledInHierarchy) {
+            //             baseComp.addEnableApplyOnce(handleFunc, arguments);
+            //             isNeedCall = false;
+            //         }
+            //     }
+            // }
             if (!!isNeedCall)
                 res = resultCall();
             return res;

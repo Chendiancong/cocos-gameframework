@@ -1,5 +1,5 @@
 import { GComponent, GList, GLoader, GObject, UIPackage } from "fairygui-cc";
-import { arrayRemove, xInstanceOf } from "../base/jsUtil";
+import { isExtends, xInstanceOf } from "../base/jsUtil";
 import type { BaseComponent } from "./BaseComponent";
 import { Node, Component, js } from "cc";
 import { getOrAddComponent } from "../utils/util";
@@ -19,12 +19,13 @@ export type FPropHandleContext<TChild extends GObject = GObject> = {
     propName: string;
 }
 
-export interface IPropCompSetupHandler {
-    onConvertComponent(type: Constructor<ViewDef.ViewComp>): Constructor<BaseComponent>|undefined;
+export interface IFguiCompHandler<T extends ViewDef.ViewComp = ViewDef.ViewComp> {
+    onConvert(targetType: Constructor<T>): Constructor<BaseComponent>|undefined;
+    onFix(targetType: Constructor<T>)
 }
 
 export class FPropUtil {
-    private _compHandlers: IPropCompSetupHandler[] = [];
+    private _compHandlers = new Map<Constructor, IFguiCompHandler>();
 
     fctrl({ instance, propName, fcom }: FPropHandleContext) {
         instance[propName] = fcom.getController(propName);
@@ -195,53 +196,34 @@ export class FPropUtil {
         } while (false);
     }
 
-    setCCRenderer(gobj: GObject, type: Constructor<ViewDef.ViewComp>) {
-        const _type = this.confirmType(type);
+    setCCRenderer(gobj: GObject, type: ViewDef.ViewCompType) {
+        const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         gobj.ccRenderer = _type;
     }
 
-    addRenderer(gobj: GObject, type: Constructor<ViewDef.ViewComp>, params?: any) {
-        const _type = this.confirmType(type);
+    addRenderer(gobj: GObject, type: ViewDef.ViewCompType, params?: any) {
+        const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         gobj.addRenderer(_type, params);
     }
 
-    addContentRenderer(gobj: GLoader, type: Constructor<ViewDef.ViewComp>, params?: any) {
-        const _type = this.confirmType(type);
+    addContentRenderer(gobj: GLoader, type: ViewDef.ViewCompType, params?: any) {
+        const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         gobj.addContentRenderer(_type);
     }
 
-    addAsyncComponentRenderer(gobj: GComponent, type: Constructor<ViewDef.ViewComp>, params?: any) {
-        const _type = this.confirmType(type);
+    addAsyncComponentRenderer(gobj: GComponent, type: ViewDef.ViewCompType, params?: any) {
+        const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
-        gobj.addAsyncComponentRenderer(_type, params)
+        gobj.addAsyncComponentRenderer(_type, params);
     }
 
-    setItemRenderer(glist: GList, type: Constructor<ViewDef.ViewComp>) {
-        const _type = this.confirmType(type);
+    setItemRenderer(glist: GList, type: ViewDef.ViewCompType) {
+        const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         glist.ccItemRenderer = _type;
-    }
-
-    setCompSetupHandler(h: IPropCompSetupHandler) {
-        if (this._compHandlers.includes(h))
-            return;
-        this._compHandlers.push(h);
-    }
-
-    unsetCompSetupHandler(h: IPropCompSetupHandler) {
-        arrayRemove(this._compHandlers, h);
-    }
-
-    confirmType(type: Constructor<ViewDef.ViewComp>) {
-        for (let i = 0, len = this._compHandlers.length; i < len; ++i) {
-            const _t = this._compHandlers[i].onConvertComponent(type);
-            if (_t)
-                return _t;
-        }
-        return void 0;
     }
 }
 

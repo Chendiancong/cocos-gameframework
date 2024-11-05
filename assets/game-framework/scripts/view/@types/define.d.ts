@@ -1,4 +1,3 @@
-
 /** 窗口大小*/
 declare enum kUiSize {
     none,
@@ -23,7 +22,7 @@ declare enum kUiParam {
 declare interface IViewRegisterInfo {
     id?: number;
     /** 类型 */
-    clazz?: Constructor<ViewDef.ViewComp>;
+    clazz?: ViewDef.ViewCompType,
     /** 层级 */
     layer?: import("../LayerMgr").UILayer;
     /** 包名 */
@@ -65,7 +64,7 @@ declare interface IFProp {
     /** FGUI元件路径*/
     path?: string;
     /** 属性类型*/
-    type?: Constructor<ViewDef.ViewComp>;
+    type?: ViewDef.ViewCompType;
     /** 子组件*/
     comp?: { comp: Constructor<ViewDef.ViewComp>, params?: { [x: string]: any }, loader?: boolean }[];
     /** 列表 */
@@ -100,5 +99,40 @@ declare interface IFProp {
 }
 
 declare namespace ViewDef {
-    type ViewComp = import('../BaseComponent').BaseComponent|import('../FScript').FScript;
+    type ViewComp<Data = any> = {
+        readonly node: import('cc').Node;
+        readonly fobj: import('fairygui-cc').GObject;
+        readonly fcom: import('fairygui-cc').GComponent;
+        readonly propsInited: boolean;
+        readonly observeWhenEnable: boolean;
+        readonly clazz: ViewCompType<ViewComp<Data>>
+
+        get data(): Data
+        set data(d: Data);
+
+        get selected(): boolean;
+        set selected(flag: boolean);
+
+        get visible(): boolean;
+        set visible(flag: boolean);
+
+        getChild(name: string): import('fairygui-cc').GObject;
+        getViewCompsInChildren(): readonly ViewComp[];
+        open?(param: any): void;
+        close?(): void;
+        reconnect?(): void;
+        /**
+         * 移除监听，做清理工作
+         * @param destroy 是否摧毁节点
+         */
+        dispose(destroy: boolean): void;
+        initProp(): void;
+    }
+
+    type ViewCompTypeConverter = {
+        convertAsWin?(): Constructor<import('../BaseComponent').BaseComponent>;
+        convertAsComponent?(): Constructor<import('../BaseComponent').BaseComponent>;
+    }
+
+    type ViewCompType<T extends ViewComp = ViewComp> = Constructor<T> & ViewCompTypeConverter;
 }

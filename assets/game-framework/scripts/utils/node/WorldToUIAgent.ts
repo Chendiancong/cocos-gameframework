@@ -154,7 +154,7 @@ export class FguiWorldToUIAgent extends WorldToUIAgent {
         throw new Error('use switchFguiHud instead')
     }
 
-    async createFgui<T extends BaseComponent>(packName: string, viewName: string, ctor: Constructor<T>): Promise<T|void> {
+    async createFgui<T extends ViewDef.ViewComp>(packName: string, viewName: string, ctor: Constructor<T>): Promise<T|void> {
         if (this._isDestroyed)
             return;
 
@@ -172,7 +172,7 @@ export class FguiWorldToUIAgent extends WorldToUIAgent {
                 this._hudNode = void 0;
             }
             const comp = gFramework.viewMgr.createComponent(ctor, packName, viewName);
-            this._hudTransform = getOrAddComponent(comp, UITransform);
+            this._hudTransform = getOrAddComponent(comp.node, UITransform);
             ResKeeper.register(comp.node, fpkg);
             this._gcomp.addChild(comp.fobj);
         }
