@@ -159,22 +159,6 @@ export function floader() {
         return fprop({ loader: { type, packageName, itemName: viewName } });
     }
 }
-// export function floader<T extends BaseComponent|FScript>(option: {
-//     comp?: Constructor<BaseComponent>|(() => Constructor<BaseComponent>),
-//     compName?: string,
-//     script?: Constructor<FScript>|(() => Constructor<FScript>),
-//     scriptName?: string,
-//     /** 外部引用包名 */
-//     packageName?: string,
-//     /** 外部引用组件名 */
-//     itemName?: string
-// }) {
-//     const {
-//         comp, compName, script, scriptName, packageName, itemName
-//     } = option;
-//     if (!comp && !compName && !script && !scriptName)
-//         throw new Error();
-// }
 
 export function fname(name: string) {
     return fprop({ name })
@@ -188,28 +172,15 @@ export function fpresstip(params: { [x: string]: any }) {
     /// return fprop({ type: LongPressTips, params });
 }
 
-export function fcomp<T extends Component>(comp: Constructor<T>): any;
-export function fcomp<T extends Component>(comp: Constructor<T>, loader: boolean): any;
-export function fcomp<T extends Component>(comp: Constructor<T>, params: { [x: string]: any }): any;
-export function fcomp<T extends Component>(comp: Constructor<T>, loader: boolean, params: { [x: string]: any }): any;
+export function fcomp<T extends ViewDef.ViewComp>(comp: ViewDef.ViewCompType): (clazzProto: T, propName: string) => any;
+export function fcomp<T extends ViewDef.ViewComp>(comp: ViewDef.ViewCompType, params: { [x: string]: any }): (clazzProto: T, propName: string) => any;
 export function fcomp() {
-    let comp = arguments[0];
-    if (arguments.length == 1) {
+    const comp = arguments[0];
+    if (arguments.length === 1)
         return fprop({ comp: [{ comp }] });
-    } else if (arguments.length >= 2) {
-        let params: any;
-        let loader: boolean;
-        if (typeof arguments[1] == "object") {
-            params = arguments[1];
-            return fprop({ comp: [{ comp, params }] });
-        } else {
-            loader = arguments[1];
-            if (arguments.length > 2) {
-                params = arguments[2];
-                return fprop({ comp: [{ comp, params, loader }] });
-            } else
-                return fprop({ comp: [{ comp, loader }] });
-        }
+    else {
+        const params = arguments[1];
+        return fprop({ comp: [{ comp, params }] });
     }
 }
 

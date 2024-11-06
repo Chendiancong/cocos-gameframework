@@ -29,6 +29,6 @@ export class StartGame extends Component {
     }
 
     closeMainUI2() {
-        
+        gFramework.viewMgr.close(MainUI2);
     }
 }
