@@ -20,8 +20,9 @@ export class FScript<T = any> implements ObserverClass, ViewDef.ViewComp<T> {
     get fcom() { return this._component?.fcom; }
     get propsInited() { return this._propsInited; }
     get observeWhenEnable() { return false; }
-    get component() { return this._component; }
+    get isValid() { return this._component?.isValid; }
     get clazz() { return this.constructor as Constructor<FScript<T>> }
+    get component() { return this._component; }
 
     get data() { return this._component?.data; }
     set data(v: T) {
@@ -138,6 +139,7 @@ export class FScript<T = any> implements ObserverClass, ViewDef.ViewComp<T> {
 
     dispose(destroy: boolean) {
         this._component?.dispose(destroy);
+        this._component = void 0;
     }
 
     initProp() {

@@ -4,6 +4,7 @@ import { UIConfig } from "fairygui-cc";
 import { fgui } from "../base/base";
 import { debugUtil } from "../base/debugUtil";
 import { defer, promisify } from "../base/promise";
+import { UIPackageHelper } from "../utils/fgui-extends/FguiExtendsHelper";
 
 export interface LoadResArgs {
     url?: string;
@@ -91,7 +92,8 @@ export class ResMgr {
     }
 
     setDefaultBundle(bundleName: string) {
-        UIConfig.defaultBundle = this._bundle = this._bundles.get(bundleName) ?? this._bundle;
+        // UIConfig.defaultBundle = this._bundle = this._bundles.get(bundleName) ?? this._bundle;
+        this._bundle = this._bundles.get(bundleName) ?? this._bundle;
     }
 
     getBundle(bundleName?: string) {
@@ -261,7 +263,7 @@ export class ResMgr {
                 }
                 if (pkg.name.toLocaleLowerCase().startsWith("common")) {
                     // 特殊处理，文本图片问题!
-                    pkg.initLoadImagesAssets();
+                    // pkg.initLoadImagesAssets();
                 }
                 //////////////////////////////
                 if (deps && deps.length > 0) {
@@ -328,22 +330,22 @@ export class ResMgr {
     /**  preload pkg  */
     preloadFPk(pkgName: string) {
         if (DEBUG) gFramework.log("#### preload pkg " + pkgName);
-        return fgui.UIPackage.preloadPackage(
-            this.getFPkgUrl(pkgName),
-            this._bundle
-        );
+        // return fgui.UIPackage.preloadPackage(
+        //     this.getFPkgUrl(pkgName),
+        //     this._bundle
+        // );
     }
 
     /**  tryLoadAloneImagePackage  */
     tryLoadAloneImagePackage(pkgName: string) {
         if (DEBUG) gFramework.log("#### tryLoadAloneImagePackage pkg " + pkgName);
-        return fgui.UIPackage.tryLoadAloneImagePackage(
-            this.getFPkgUrl(pkgName)
-        ).then((result: string[]) => {
-            if (DEBUG && result && result.length) {
-                gFramework.log("#### tryLoadAloneImagePackage pkg " + pkgName + "  size:" + result.length);
-            }
-        });
+        // return fgui.UIPackage.tryLoadAloneImagePackage(
+        //     this.getFPkgUrl(pkgName)
+        // ).then((result: string[]) => {
+        //     if (DEBUG && result && result.length) {
+        //         gFramework.log("#### tryLoadAloneImagePackage pkg " + pkgName + "  size:" + result.length);
+        //     }
+        // });
     }
 
     loadUuid<T extends Asset>(uuid: string): Promise<T> {
@@ -365,7 +367,7 @@ export class ResMgr {
     onRestart() {
         this._bundles.forEach(v => v.releaseAll());
         this._bundles.clear();
-        fgui.UIPackage.removeAllPackage();
+        UIPackageHelper.removeAllPackage();
     }
 
     reset() {
@@ -430,11 +432,12 @@ export class ResMgr {
     }
 
     public checkIsResidentPkg(pkgName: string) {
-        if (!pkgName) return false;
-        return !!UIConfig.residentPkgKeys.find((key) => {
-            let checkStr = pkgName.toLocaleLowerCase();
-            return checkStr.startsWith(key) || checkStr.endsWith(key);
-        });
+        // if (!pkgName) return false;
+        // return !!UIConfig.residentPkgKeys.find((key) => {
+        //     let checkStr = pkgName.toLocaleLowerCase();
+        //     return checkStr.startsWith(key) || checkStr.endsWith(key);
+        // });
+        return false;
     }
 
 }

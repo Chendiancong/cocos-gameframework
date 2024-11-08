@@ -211,31 +211,31 @@ export class BaseComponent<T = any> extends Component implements ViewDef.ViewCom
     }
 
     private _observerModleFun() {
-        this.fcom.observerModleEnable = () => {
-            if (this.node.isValid) {
-                Object.keys(this._enableCallFunOnceDic).forEach(functionName => {
-                    let enableCallFunOnceObj = this._enableCallFunOnceDic[functionName];
-                    if (!!enableCallFunOnceObj) {
-                        let results: any[] = [];
-                        Object.keys(enableCallFunOnceObj.args).forEach(key => {
-                            results.push(enableCallFunOnceObj.args[key]);
-                        });
-                        enableCallFunOnceObj.func.call(this, ...results);
-                    }
-                }, this);
-                Object.keys(this._enableCallFunDic).forEach(functionName => {
-                    let enableCallFunObj = this._enableCallFunDic[functionName];
-                    if (!!enableCallFunObj) {
-                        let results: any[] = [];
-                        Object.keys(enableCallFunObj.args).forEach(key => {
-                            results.push(enableCallFunObj.args[key]);
-                        });
-                        enableCallFunObj.func.call(this, ...results);
-                    }
-                }, this);
-            }
-            this._enableCallFunOnceDic = {};
-        }
+        // this.fcom.observerModleEnable = () => {
+        //     if (this.node.isValid) {
+        //         Object.keys(this._enableCallFunOnceDic).forEach(functionName => {
+        //             let enableCallFunOnceObj = this._enableCallFunOnceDic[functionName];
+        //             if (!!enableCallFunOnceObj) {
+        //                 let results: any[] = [];
+        //                 Object.keys(enableCallFunOnceObj.args).forEach(key => {
+        //                     results.push(enableCallFunOnceObj.args[key]);
+        //                 });
+        //                 enableCallFunOnceObj.func.call(this, ...results);
+        //             }
+        //         }, this);
+        //         Object.keys(this._enableCallFunDic).forEach(functionName => {
+        //             let enableCallFunObj = this._enableCallFunDic[functionName];
+        //             if (!!enableCallFunObj) {
+        //                 let results: any[] = [];
+        //                 Object.keys(enableCallFunObj.args).forEach(key => {
+        //                     results.push(enableCallFunObj.args[key]);
+        //                 });
+        //                 enableCallFunObj.func.call(this, ...results);
+        //             }
+        //         }, this);
+        //     }
+        //     this._enableCallFunOnceDic = {};
+        // }
     }
 
     protected onDispose() { }
@@ -253,6 +253,7 @@ export class BaseComponent<T = any> extends Component implements ViewDef.ViewCom
         if (destroy) {
             this.fcom?.dispose();
         }
+        this.destroy();
     }
 
     getParentBaseComponent() {
@@ -372,7 +373,7 @@ export class BaseComponent<T = any> extends Component implements ViewDef.ViewCom
             let comp: any;
             type = fprop.type;
             if (!!type) {
-                fchild.ccRenderer = type;
+                fchild.ccRenderClazz = type;
                 comp = fchild.ccRender;
                 let params = fprop.params;
                 if (!!params) {
@@ -405,8 +406,6 @@ export class BaseComponent<T = any> extends Component implements ViewDef.ViewCom
                 let loader = fprop.loader;
                 let packageName = loader.packageName;
                 let viewName = loader.itemName;
-                fchild.componentTouch = true;
-                fchild.componentRender = true;
                 fpropUtil.setCCRenderer(fchild, loader.type);
                 if (packageName && viewName) {
                     if (UIPackage.getByName(packageName)) {

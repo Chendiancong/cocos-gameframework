@@ -70,8 +70,6 @@ export class FPropUtil {
         const packageName = loader.packageName;
         const itemName = loader.itemName;
         const fchild = _fchild as GLoader;
-        fchild.componentTouch = true;
-        fchild.componentRender = true;
         this.setCCRenderer(fchild, loader.type);
         if (packageName && itemName) {
             if (UIPackage.getByName(packageName)) {
@@ -199,7 +197,7 @@ export class FPropUtil {
     setCCRenderer(gobj: GObject, type: ViewDef.ViewCompType) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
-        gobj.ccRenderer = _type;
+        gobj.ccRenderClazz = _type;
     }
 
     addRenderer(gobj: GObject, type: ViewDef.ViewCompType, params?: any) {
@@ -211,7 +209,7 @@ export class FPropUtil {
     addContentRenderer(gobj: GLoader, type: ViewDef.ViewCompType, params?: any) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
-        gobj.addContentRenderer(_type);
+        gobj.addContentRenderClazz(_type);
     }
 
     addAsyncComponentRenderer(gobj: GComponent, type: ViewDef.ViewCompType, params?: any) {
@@ -223,7 +221,7 @@ export class FPropUtil {
     setItemRenderer(glist: GList, type: ViewDef.ViewCompType) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
-        glist.ccItemRenderer = _type;
+        glist.ccItemRenderClazz = _type;
     }
 }
 

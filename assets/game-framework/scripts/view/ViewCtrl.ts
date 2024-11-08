@@ -3,12 +3,10 @@ import { fgui } from "../base/base";
 import { defer } from "../base/promise";
 import { getOrAddComponent } from "../utils/util";
 import { BaseComponent } from "./BaseComponent";
-import { BaseWin, IBaseWin } from "./BaseWin";
+import { IBaseWin } from "./BaseWin";
 import { addTask } from "./TaskMgr";
 import { DEBUG } from "cc/env";
-import { MyEvent } from "fairygui-cc";
 import { ViewBetween } from "./ViewBetween";
-import { fpropUtil } from "./FPropUtil";
 
 const { ccclass } = _decorator;
 const enum kViewState {
@@ -27,7 +25,7 @@ export function createViewCtrl(
     container = new fgui.GComponent();
     container.opaque = false;
     container.touchable = true;
-    container.makeFullContainer(layer.parent);
+    container.makeFullWithTarget(layer.parent);
     container.addRelation(gFramework.layerMgr.fRoot, fgui.RelationType.Size);
     container.node.name = builder.info.className ?? builder.info.viewName;
     let ctrl = container.node.addComponent(ViewCtrl);
@@ -177,7 +175,7 @@ export class ViewCtrl extends Component {
         this._alphaEffect = value;
         let view = this.view;
         if (!view) return;
-        view.fcom.alpha = Math.min(view.fcom.initAlpha, value);
+        view.fcom.alpha = value;
         view.fcom.scaleX = view.fcom.scaleY = lerp(0.2, 1, value);
     }
 
@@ -319,7 +317,6 @@ export class ViewCtrl extends Component {
                     comp.dispose(false);
                 }
             }
-            view.fcom.closeTask();
         }
 
         this.fcom.removeFromParent();
@@ -362,7 +359,6 @@ export class ViewCtrl extends Component {
                 this.node.emit(EventType.loaded, this);
                 ///////////////////////
                 if (isNaN(this.alphaEffect)) {
-                    this.node.emit(MyEvent.WINTWEENEND, this);
                     gFramework.viewMgr.setTweening(false);
                     ViewBetween.ins.hideLoading();
                 } else {
@@ -373,7 +369,6 @@ export class ViewCtrl extends Component {
                             this._tween = null;
                             delete this._ktweeningCtrkey[this.view.ctrlKey];
                             gFramework.viewMgr.setTweening(false);
-                            this.node.emit(MyEvent.WINTWEENEND, this);
                             ViewBetween.ins.hideLoading();
                         })
                         .start();
@@ -492,7 +487,7 @@ export class ViewCtrl extends Component {
         let parent = this.fcom;
         let view = this.view.fcom;
         if (this.border || this.sizeMode === kUiSize.full || this.sizeMode === kUiSize.mixFull) {
-            view.makeFullContainer(parent);
+            view.makeFullWithTarget(parent);
             view.setPosition(0, 0);
             view.addRelation(parent, fgui.RelationType.Size);
         } else {

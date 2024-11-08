@@ -526,14 +526,14 @@ export class ViewMgr extends EventTarget {
     public createComponent<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompType<T>, packName: string, viewName: string): T {
         let obj: GObject;
         obj = UIPackage.createObject(packName, viewName);
-        obj.ccRenderer = ctor.convertAsComponent();
+        obj.ccRenderClazz = ctor.convertAsComponent();
         return obj.ccRender as T;
     }
 
     public createComponentFromPool<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompType<T>, packName: string, viewName: string, pool?: GObjectPool) {
         const obj: GObject = this.createObjectFromPool(packName, viewName, pool);
         if (obj)
-            obj.ccRenderer = ctor.convertAsComponent();
+            obj.ccRenderClazz = ctor.convertAsComponent();
         return obj.ccRender as T;
     }
 

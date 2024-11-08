@@ -105,6 +105,7 @@ declare namespace ViewDef {
         readonly fcom: import('fairygui-cc').GComponent;
         readonly propsInited: boolean;
         readonly observeWhenEnable: boolean;
+        readonly isValid: boolean;
         readonly clazz: ViewCompType<ViewComp<Data>>
 
         get data(): Data

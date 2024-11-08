@@ -1,10 +1,11 @@
-import { _decorator, EventTarget, screen, lerp, director, Node, Vec2, UITransform, Vec3, Camera, Rect } from 'cc';
+import { _decorator, EventTarget, screen, lerp, director, Node, Vec2, UITransform, Vec3, Camera, Rect, view } from 'cc';
 import { WECHAT } from 'cc/env';
 import * as fgui from 'fairygui-cc';
 import { gMath } from '../utils/math/MathUtil';
 import { PoolManager } from '../base/ObjectPool';
 import { PooledVec3 } from '../utils/math/PooledCCValues';
 import { IGameInstance } from '../base/BaseGameInstance';
+import { GRootHelper } from '../utils/fgui-extends/FguiExtendsHelper';
 const { ccclass } = _decorator;
 
 export enum UILayer {
@@ -72,7 +73,7 @@ export class LayerMgr extends EventTarget {
 
     init({ uiRootNode: rootNode }: IGameInstance) {
         rootNode = rootNode ?? director.getScene().getChildByName('Canvas') ?? director.getScene();
-        this.fRoot = fgui.GRoot.create(rootNode);
+        this.fRoot = GRootHelper.create(rootNode);
         this.mainLayer = new FGUILayerNode(UILayer.UI_Root);
         this.mainLayer.node.name = UILayer[UILayer.UI_Root];
         this.fRoot.addChild(this.mainLayer);
@@ -82,7 +83,7 @@ export class LayerMgr extends EventTarget {
             const layer = this._fguiLayers[i] = new FGUILayerNode(i);
             layer.node.name = UILayer[i] ?? 'GComponent';
             this.mainLayer.addChild(layer);
-            layer.makeFullContainer(this.mainLayer);
+            layer.makeFullWithTarget(this.mainLayer);
             layer.addRelation(this.mainLayer, fgui.RelationType.Size);
         }
 
@@ -116,7 +117,7 @@ export class LayerMgr extends EventTarget {
     }
 
     private _layerAdapt() {
-        fgui.DragDropManager.inst.offYSize = this.offsetSize;
+        // fgui.DragDropManager.inst.offYSize = this.offsetSize;
         if (!!this.mainLayer) {
             this.mainLayer.y = this.offsetSize;
             this.mainLayer.height = this.fRoot.height - this.offsetSize;
@@ -177,7 +178,8 @@ export class LayerMgr extends EventTarget {
         felem.localToGlobal(x, y, v2);
         // ui的设置是水平居中显示，水平不会拉伸，它的宽度恒定为设计分辨率的宽度(当前为750)，两边容许黑边，为了同时适配宽屏，需要将x坐标进行一定的转化
         // box.leftX = v2.x;
-        box.leftX = Math.max(0, this.fRoot.width - fgui.UIConfig.designWidth) / 2 + v2.x;
+        // box.leftX = Math.max(0, this.fRoot.width - fgui.UIConfig.designWidth) / 2 + v2.x;
+        box.leftX = Math.max(0, this.fRoot.width - view.getDesignResolutionSize().width) / 2 + v2.x;
         box.topY = v2.y;
         box.width = width * scaleX;
         box.height = height * scaleY;

@@ -121,7 +121,7 @@ class SubView {
         if (!this._inited) {
             this._inited = true;
             this._inner.url = gFramework.viewMgr.getItemURL(this._packName, this._viewName);
-            this._inner.addContentRenderer(this._ccCompCtor);
+            this._inner.addContentRenderClazz(this._ccCompCtor);
             if (this._inner.loaded)
                 this._defers.resolve('innerLoaded');
             else
