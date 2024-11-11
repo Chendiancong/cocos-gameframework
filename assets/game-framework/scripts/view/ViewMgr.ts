@@ -7,6 +7,7 @@ import { CustomEvent } from "../events/Event";
 import { DEBUG } from "cc/env";
 import { GComponent, GObject, GObjectPool, GRoot, RelationType, UIPackage } from "fairygui-cc";
 import { ITimerHandler, timerCenter } from "../timer/TimerCenter";
+import type { FScriptComponent } from "./FScript";
 
 const _offWidth: number = 80;
 const _offHight: number = 160;
@@ -523,18 +524,24 @@ export class ViewMgr extends EventTarget {
         }
     }
 
-    public createComponent<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompType<T>, packName: string, viewName: string): T {
+    public createComponent<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompClazz<T>, packName: string, viewName: string): T {
         let obj: GObject;
         obj = UIPackage.createObject(packName, viewName);
         obj.ccRenderClazz = ctor.convertAsComponent();
-        return obj.ccRender as T;
+        if (ctor.isScript)
+            return (obj.ccRender as FScriptComponent).fscript as any;
+        else
+            return obj.ccRender as BaseComponent as any;
     }
 
-    public createComponentFromPool<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompType<T>, packName: string, viewName: string, pool?: GObjectPool) {
+    public createComponentFromPool<T extends ViewDef.ViewComp>(ctor: ViewDef.ViewCompClazz<T>, packName: string, viewName: string, pool?: GObjectPool): T {
         const obj: GObject = this.createObjectFromPool(packName, viewName, pool);
         if (obj)
             obj.ccRenderClazz = ctor.convertAsComponent();
-        return obj.ccRender as T;
+        if (ctor.isScript)
+            return (obj.ccRender as FScriptComponent).fscript as any;
+        else
+            return obj.ccRender as BaseComponent as any;
     }
 
     public returnComponent<T extends ViewDef.ViewComp>(comp: T, pool?: GObjectPool) {

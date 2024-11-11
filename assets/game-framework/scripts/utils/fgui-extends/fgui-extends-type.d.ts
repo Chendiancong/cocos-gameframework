@@ -12,11 +12,11 @@ declare namespace FguiExtends {
     }
 
     interface GObjectExtends {
-        get ccRenderClazz(): Constructor<import('cc').Component>;
-        set ccRenderClazz(val: this['ccRenderClazz']);
+        get ccRenderClazz(): Constructor<FguiComponent>;
+        set ccRenderClazz(val: Constructor<FguiComponent>);
 
-        get ccRender(): import('cc').Component;
-        set ccRender(val: this['ccRender']);
+        get ccRender(): FguiComponent;
+        set ccRender(val: FguiComponent);
 
         xLocalToGlobal(ax?: number, ay?: number, result?: import('cc').Vec2): import('cc').Vec2;
         xGlobalToLocal(ax?: number, ay?: number, result?: import('cc').Vec2): import('cc').Vec2;
@@ -45,10 +45,7 @@ declare namespace FguiExtends {
         removeContentRenderClazzes(targetClazzs?: Constructor<FguiComponent>[]): void;
     }
 
-    interface UIPackageExtends {
-        addRef(): import('fairygui-cc').UIPackage;
-        decRef(): import('fairygui-cc').UIPackage;
-    }
+    interface UIPackageExtends extends gFramework.IRefCountable { }
 }
 
 declare module 'fairygui-cc' {

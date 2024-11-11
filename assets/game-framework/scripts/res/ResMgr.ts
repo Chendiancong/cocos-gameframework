@@ -1,19 +1,9 @@
-import { Asset, assetManager, AssetManager, Constructor, js, resources } from "cc";
-import { DEBUG } from "cc/env";
-import { UIConfig } from "fairygui-cc";
+import { Asset, assetManager, AssetManager, Constructor, resources } from "cc";
+import { UIPackage } from "fairygui-cc";
 import { fgui } from "../base/base";
-import { debugUtil } from "../base/debugUtil";
 import { defer, promisify } from "../base/promise";
 import { UIPackageHelper } from "../utils/fgui-extends/FguiExtendsHelper";
-
-export interface LoadResArgs {
-    url?: string;
-    urls?: string[];
-    type?: typeof Asset;
-    bundle?: AssetManager.Bundle;
-    onCompleted?: LoadCompleteCallback<Asset>;
-    onProgess?: LoadProgressCallback;
-}
+import { classMeta } from "../utils/Meta";
 
 export type LoadCompleteCallback<T> = (
     error: Error | null | undefined,
@@ -48,10 +38,11 @@ function defaultBundleLoader(this: ResMgr, bundleName: string): Promise<AssetMan
 export class ResMgr {
     readonly defaultBundleLoader = defaultBundleLoader;
 
-    private _bundle: AssetManager.Bundle = resources;
-    private _fpkgConfig: IFpkgConfig;
+    private _defaultBundle: AssetManager.Bundle = resources;
     private _bundles: Map<string, AssetManager.Bundle> = new Map();
+    private _fpkgConfig: IFpkgConfig;
     private _specificBundleLoader: (bundleName: string) => Promise<AssetManager.Bundle>;
+
     constructor() {
         this._fpkgConfig = {
             directory: "fgui"
@@ -92,12 +83,11 @@ export class ResMgr {
     }
 
     setDefaultBundle(bundleName: string) {
-        // UIConfig.defaultBundle = this._bundle = this._bundles.get(bundleName) ?? this._bundle;
-        this._bundle = this._bundles.get(bundleName) ?? this._bundle;
+        this._defaultBundle = this._bundles.get(bundleName) ?? this._defaultBundle;
     }
 
     getBundle(bundleName?: string) {
-        return !!bundleName ? this._bundles.get(bundleName) : this._bundle;
+        return !!bundleName ? this._bundles.get(bundleName) : this._defaultBundle;
     }
 
     setFPkgConfig(config: IFpkgConfig) {
@@ -110,24 +100,28 @@ export class ResMgr {
 
     getRes<T>(path: string, type: Constructor<T>): T;
     getRes(path: string, type: typeof Asset) {
-        return this._bundle.get(path, type);
+        return this._defaultBundle.get(path, type);
     }
 
     private _errorTimes: Record<string, number> = Object.create(null);
     private _noMoreLoad: Record<string, boolean> = Object.create(null);
-    loadRes<T>(url: string,
-        type?: typeof Asset,
+    loadRes<T extends Asset>(url: string,
+        type?: Constructor<T>,
         bundle?: AssetManager.Bundle,
         progressCallback?: LoadProgressCallback,
-        completeCallback?: LoadCompleteCallback<Asset>
+        completeCallback?: LoadCompleteCallback<T>
     ) {
         if (this._noMoreLoad[url]) {
             throw new Error(`${url} is unreachable`);
         }
-        let resArgs: LoadResArgs = ResMgr.makeLoadResArgs.apply(
-            this,
-            arguments
-        );
+
+        let resArgs = new LoadResArgs();
+        resArgs
+            .set('type', type)
+            .set('url', url)
+            .set('bundle', bundle)
+            .set('onProgress', progressCallback)
+            .set('onCompleted', completeCallback);
         let finishCallback = (error: Error, resource: Asset) => {
             if (!error) {
                 this._finishItem(resource, resArgs.url);
@@ -144,13 +138,13 @@ export class ResMgr {
                 } else
                     this._errorTimes[url] = times;
             }
-            if (completeCallback) completeCallback(error, resource);
+            if (completeCallback) completeCallback(error, resource as any);
         };
 
-        (resArgs.bundle ?? this._bundle).load(
+        (resArgs.bundle ?? this._defaultBundle).load(
             resArgs.url,
             resArgs.type,
-            resArgs.onProgess,
+            resArgs.onProgress,
             finishCallback
         );
     }
@@ -162,10 +156,13 @@ export class ResMgr {
         progressCallback?: LoadProgressCallback,
         completeCallback?: LoadCompleteCallback<Asset>
     ) {
-        let resArgs: LoadResArgs = ResMgr.makeLoadResArgs.apply(
-            this,
-            arguments
-        );
+        const resArgs = new LoadResArgs();
+        resArgs
+            .set('url', url)
+            .set('type', type)
+            .set('bundle', bundle ?? this._defaultBundle)
+            .set('onProgress', progressCallback)
+            .set('onCompleted', completeCallback);
         let finishCallback = (error: Error, resources: Asset[]) => {
             if (!error) {
                 for (let resource of resources) {
@@ -176,10 +173,10 @@ export class ResMgr {
                 resArgs.onCompleted(error, resources);
             }
         };
-        (resArgs.bundle ?? this._bundle).loadDir(
+        (resArgs.bundle ?? this._defaultBundle).loadDir(
             resArgs.url,
             resArgs.type,
-            resArgs.onProgess,
+            resArgs.onProgress,
             finishCallback
         );
     }
@@ -191,10 +188,13 @@ export class ResMgr {
         progressCallback?: LoadProgressCallback,
         completeCallback?: LoadCompleteCallback<Asset>
     ) {
-        let resArgs: LoadResArgs = ResMgr.makeLoadResArgs.apply(
-            this,
-            arguments
-        );
+        const resArgs = new LoadResArgs();
+        resArgs
+            .set('urls', urls)
+            .set('type', type)
+            .set('bundle', bundle ?? this._defaultBundle)
+            .set('onProgress', progressCallback)
+            .set('onCompleted', completeCallback);
         let finishCallback = (error: Error, resources: Asset[]) => {
             if (!error) {
                 for (let i = 0, il = resources.length; i < il; i++) {
@@ -205,10 +205,10 @@ export class ResMgr {
                 resArgs.onCompleted(error, resources);
             }
         };
-        (resArgs.bundle ?? this._bundle).load(
+        (resArgs.bundle ?? this._defaultBundle).load(
             resArgs.urls,
             resArgs.type,
-            resArgs.onProgess,
+            resArgs.onProgress,
             finishCallback
         );
     }
@@ -221,140 +221,130 @@ export class ResMgr {
         // this.autoReleasePool.add(asset, url);
     }
 
-    private _loadingPkg: { [name: string]: any[] } = Object.create(null);
+    private _loadingPkg: Record<string, any[]> = Object.create(null);
+    private _fpkgAssets: Record<string, IFPkgAsset> = Object.create(null);
 
-    loadFPkg(name: string, onCompleted?: (err: Error, pkg: fgui.UIPackage) => void) {
-        let pkg = this.getFPkg(name);
-        if (pkg) {
-            this._finishItem(pkg, pkg.path);
-            if (onCompleted) onCompleted(null, pkg);
+    loadFPkg(name: string, onCompleted?: (err: Error, asset: IFPkgAsset) => void) {
+        const asset = this.getFPkgAsset(name);
+        if (asset?.isValid) {
+            this._finishItem(asset.pkg, asset.pkg.path);
+            if (onCompleted)
+                onCompleted(null, asset);
             return;
         }
 
         if (this._loadingPkg[name]) {
-            if (onCompleted) this._loadingPkg[name].push(onCompleted);
+            if (onCompleted)
+                this._loadingPkg[name].push(onCompleted);
             return;
         }
-        if (onCompleted) this._loadingPkg[name] = [onCompleted];
-        this.loadSinglePkg(name, (err, pkg) => {
-            if (!err) {
-                let deps = pkg.dependencies;
-                if (DEBUG) {
-                    console.log("####当前加载包## " + name);
-                    let dependNames = deps.map(dep => dep.name);
-                    if (this.checkIsResidentPkg(name)) {
-                        if (!!dependNames.length) {
-                            console.log("#### =========依赖=========  ");
-                            console.log("####" + dependNames.join(" , "));
-                            console.log("#### =======================");
-                        } else {
-                            console.log("#### =======" + name + "  √无依赖");
-                        }
-                    } else {
-                        let flag = false;
-                        dependNames.forEach((n => {
-                            if (!this.checkIsResidentPkg(n)) {
-                                flag = true;
-                                gFramework.log("####注意!! " + name + "  引用关联包-->" + n + " 可能有误，请检查fgui文件");
-                            }
-                        }));
-                        if (!flag) console.log("#### =======" + name + "  √无依赖");
+
+        if (onCompleted)
+            this._loadingPkg[name] = [onCompleted];
+
+        this._loadSinglePkg(name, (err, asset) => {
+            if (err) {
+                if (onCompleted)
+                    onCompleted(err, null);
+                else
+                    throw err;
+                return;
+            }
+            this._loadPkgDependices(
+                asset,
+                _err => {
+                    if (!_err)
+                        this._finishItem(asset.pkg, asset.pkg.path);
+                    if (this._loadingPkg[name]) {
+                        const list = this._loadingPkg[name];
+                        delete this._loadingPkg[name];
+                        list.forEach(cb => cb(_err, asset));
                     }
                 }
-                if (pkg.name.toLocaleLowerCase().startsWith("common")) {
-                    // 特殊处理，文本图片问题!
-                    // pkg.initLoadImagesAssets();
-                }
-                //////////////////////////////
-                if (deps && deps.length > 0) {
-                    this.loadPkgDependencies(deps, (err) => {
-                        if (!err)
-                            this._finishItem(pkg, pkg.path);
-                        if (this._loadingPkg[name]) {
-                            this._loadingPkg[name].forEach(cb => cb(err, pkg));
-                            this._loadingPkg[name] = null;
-                        }
-                    });
-                    return;
-                }
-                this._finishItem(pkg, pkg.path);
-            }
-            if (this._loadingPkg[name]) {
-                this._loadingPkg[name].forEach(cb => cb(err, pkg));
-                this._loadingPkg[name] = null;
-            }
+            )
         });
     }
 
-    private loadSinglePkg(name: string, onCompleted: (err: Error, pkg: fgui.UIPackage) => void) {
-        let pkg = this.getFPkg(name);
-        if (!!pkg) {
-            onCompleted(null, pkg);
-        } else {
-            fgui.UIPackage.loadPackage(this._bundle, this.getFPkgUrl(name), onCompleted);
-        }
+    private _loadSinglePkg(name: string, onCompleted: (err: Error, asset: IFPkgAsset) => void) {
+        const asset = this.getFPkgAsset(name);
+        if (!!asset)
+            onCompleted(null, asset);
+        else
+            UIPackage.loadPackage(
+                this._defaultBundle,
+                this.getFPkgUrl(name),
+                (err, pkg) => {
+                    if (err) {
+                        onCompleted(err, null);
+                        return;
+                    }
+                    let asset = this._fpkgAssets[name]
+                    if (!asset)
+                        asset = this._fpkgAssets[name] = new _FPkgAsset(this, pkg);
+                    onCompleted(err, asset);
+                }
+            );
     }
 
-    private loadPkgDependencies(dependencies: Array<{ id: string, name: string }>, onCompleted: (err: Error) => void) {
-        let _err: Error = null;
+    private _loadPkgDependices(root: IFPkgAsset, onCompleted: (err: Error) => void) {
+        let err: Error = null;
+        const dependencies = root.pkg.dependencies;
         let count = dependencies.length;
-        let pkgCompleted = function (err: Error) {
-            count--;
-            if (!_err) _err = err;
-            if (count == 0) {
-                onCompleted(_err);
-            }
+        if (count === 0) {
+            onCompleted(null);
+            return;
         }
-        for (let i = 0, il = count, name: string, pkg: fgui.UIPackage; i < il; i++) {
-            name = dependencies[i].name;
-            pkg = this.getFPkg(name);
-            if (pkg) {
-                pkg.addRef();
+
+        let pkgCompleted = function (_err: Error) {
+            count--;
+            if (!err)
+                err = _err;
+            if (count === 0 || err)
+                onCompleted(err);
+        }
+
+        for (let i = 0, len = count; i < len; ++i) {
+            const { name } = dependencies[i];
+            const dependentAsset = this._fpkgAssets[name];
+            if (dependentAsset) {
+                dependentAsset.addRef();
                 pkgCompleted(null);
-            }
-            else {
-                this.loadSinglePkg(name, (err, pkg) => {
-                    pkg.addRef();
-                    let deps = pkg.dependencies;
-                    if (deps && deps.length > 0)
-                        this.loadPkgDependencies(deps, pkgCompleted);
-                    else
+            } else {
+                this._loadSinglePkg(name, (err, asset) => {
+                    if (err) {
                         pkgCompleted(err);
+                        return;
+                    }
+                    asset.addRef();
+                    this._loadPkgDependices(
+                        asset,
+                        pkgCompleted
+                    );
                 });
             }
         }
     }
 
-    aloadFPkg: (name: string) => Promise<fgui.UIPackage> = promisify(this.loadFPkg.bind(this));
-
-    /**  preload pkg  */
-    preloadFPk(pkgName: string) {
-        if (DEBUG) gFramework.log("#### preload pkg " + pkgName);
-        // return fgui.UIPackage.preloadPackage(
-        //     this.getFPkgUrl(pkgName),
-        //     this._bundle
-        // );
-    }
-
-    /**  tryLoadAloneImagePackage  */
-    tryLoadAloneImagePackage(pkgName: string) {
-        if (DEBUG) gFramework.log("#### tryLoadAloneImagePackage pkg " + pkgName);
-        // return fgui.UIPackage.tryLoadAloneImagePackage(
-        //     this.getFPkgUrl(pkgName)
-        // ).then((result: string[]) => {
-        //     if (DEBUG && result && result.length) {
-        //         gFramework.log("#### tryLoadAloneImagePackage pkg " + pkgName + "  size:" + result.length);
-        //     }
-        // });
-    }
+    aloadFPkg: (name: string) => Promise<IFPkgAsset> = promisify(this.loadFPkg.bind(this));
 
     loadUuid<T extends Asset>(uuid: string): Promise<T> {
         return ResMgr.loadUuid<T>(uuid);
     }
-    ////////////////////////////////////////
 
-    getFPkg(name: string) {
-        return fgui.UIPackage.getByName(name);
+    getFPkgAsset(name: string) {
+        const asset = this._fpkgAssets[name];
+        if (asset?.isValid)
+            return asset;
+        else
+            return void 0;
+    }
+
+    removePkg(name: string) {
+        const asset = this._fpkgAssets[name];
+        if (asset?.isValid) {
+            delete this._fpkgAssets[name];
+            asset.release();
+        }
     }
 
     private getFPkgUrl(name: string) {
@@ -371,48 +361,13 @@ export class ResMgr {
     }
 
     reset() {
-        this._bundle = resources;
+        this._defaultBundle = resources;
         // this.autoReleasePool.reset();
         // fgui.UIPackage.removeAllPackage();
     }
 
     free() {
         ///setTimeout(() => this.autoReleasePool.free());
-    }
-
-    static makeLoadResArgs(): LoadResArgs {
-        if (arguments.length < 1) {
-            debugUtil.error(`makeLoadResArgs error ${arguments}`);
-            return null;
-        }
-
-        let ret: LoadResArgs = {};
-        if (typeof arguments[0] === "string") {
-            ret.url = arguments[0];
-        } else if (Array.isArray(arguments[0])) {
-            ret.urls = arguments[0];
-        } else {
-            debugUtil.error(`makeLoadResArgs error ${arguments}`);
-            return null;
-        }
-
-        for (let i = 1; i < arguments.length; ++i) {
-            if (i === 1 && js.isChildClassOf(arguments[i], Asset)) {
-                ret.type = arguments[i];
-            } else if (i === 2 && arguments[i] instanceof AssetManager.Bundle) {
-                ret.bundle = arguments[i];
-            } else if (typeof arguments[i] === "function") {
-                if (i < arguments.length - 1 &&
-                    typeof arguments[i + 1] === "function"
-                ) {
-                    ret.onProgess = arguments[i];
-                } else {
-                    ret.onCompleted = arguments[i];
-                }
-            }
-        }
-
-        return ret;
     }
 
     static loadUuid<T extends Asset>(uuid: string): Promise<T> {
@@ -430,14 +385,88 @@ export class ResMgr {
             )
         });
     }
+}
 
-    public checkIsResidentPkg(pkgName: string) {
-        // if (!pkgName) return false;
-        // return !!UIConfig.residentPkgKeys.find((key) => {
-        //     let checkStr = pkgName.toLocaleLowerCase();
-        //     return checkStr.startsWith(key) || checkStr.endsWith(key);
-        // });
-        return false;
+class _FPkgAsset implements gFramework.IRefCountable {
+    private _refCount = 0;
+    private _pkg: UIPackage;
+    private _pkgName: string;
+    private _pkgId: string;
+    private _resMgr: ResMgr;
+
+    get refCount() { return this._refCount; }
+    get pkg() { return this._pkg; }
+    get pkgName() { return this._pkgName; }
+    get pkgId() { return this._pkgId; }
+    get isValid() { return !!this.pkg; }
+
+    constructor(resMgr: ResMgr, pkg: UIPackage) {
+        this._resMgr = resMgr;
+        this._pkg = pkg;
+        this._pkgName = pkg.name;
+        this._pkgId = pkg.id;
     }
 
+    addRef() {
+        ++this._refCount;
+        return this;
+    }
+
+    decRef() {
+        this._refCount = Math.max(0, this._refCount - 1);
+        if (this._refCount <= 0)
+            this._resMgr.removePkg(this.pkgName);
+        return this;
+    }
+
+    release() {
+        if (!this.isValid)
+            return;
+
+        const pkg = this._pkg;
+        delete this._pkg;
+        const dependencies = pkg.dependencies;
+        const resMgr = this._resMgr;
+        for (const { name } of dependencies) {
+            const dep = resMgr.getFPkgAsset(name);
+            if (dep?.isValid)
+                dep.decRef();
+        }
+        UIPackage.removePackage(this.pkgId);
+    }
+}
+
+export type IFPkgAsset = _FPkgAsset;
+
+interface ILoadResArgs {
+    url: string;
+    urls: string[];
+    type: Constructor<Asset>,
+    bundle: AssetManager.Bundle;
+    onCompleted: LoadCompleteCallback<Asset>;
+    onProgress: LoadProgressCallback;
+}
+
+class LoadResArgs implements ILoadResArgs {
+    @classMeta.prop
+    url: string;
+    @classMeta.prop
+    urls: string[];
+    @classMeta.prop
+    type: Constructor<Asset>;
+    @classMeta.prop
+    bundle: AssetManager.Bundle;
+    @classMeta.prop
+    onCompleted: LoadCompleteCallback<Asset>;
+    @classMeta.prop
+    onProgress: LoadProgressCallback;
+
+    set<K extends keyof ILoadResArgs>(key: K, value: ILoadResArgs[K]) {
+        this[key] = value as any;
+        return this;
+    }
+
+    dispose() {
+        classMeta.reset(this);
+    }
 }

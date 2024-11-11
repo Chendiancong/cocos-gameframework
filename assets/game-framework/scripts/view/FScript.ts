@@ -6,6 +6,7 @@ import { IBaseWin } from "./BaseWin";
 import { CommonWin } from "./CommonWin";
 import { getGlobal } from "../base/base";
 import { _decorator, Component } from "cc";
+import { ViewCompType } from "./view-define";
 
 export interface FScript<T = any> extends ObserverClass {}
 
@@ -21,7 +22,8 @@ export class FScript<T = any> implements ObserverClass, ViewDef.ViewComp<T> {
     get propsInited() { return this._propsInited; }
     get observeWhenEnable() { return false; }
     get isValid() { return this._component?.isValid; }
-    get clazz() { return this.constructor as Constructor<FScript<T>> }
+    get clazz() { return this.constructor as ViewDef.ViewCompClazz<FScript<T>>; }
+    get compType() { return ViewCompType.FScript; }
     get component() { return this._component; }
 
     get data() { return this._component?.data; }
@@ -41,6 +43,10 @@ export class FScript<T = any> implements ObserverClass, ViewDef.ViewComp<T> {
         if (this._component?.isValid)
             this._component.visible = flag;
     }
+
+    static get compType() { return ViewCompType.FScript; }
+
+    static get isScript() { return true; }
 
     static convertAsWin(): Constructor<BaseComponent> {
         throw new Error();
@@ -191,6 +197,10 @@ export class FScriptWin extends FScript<any> implements IBaseWin {
         if (ctrlKey)
             return gFramework.viewMgr.getViewCtrl(ctrlKey);
     }
+
+    static get compType() { return ViewCompType.FScriptWin; }
+
+    static get isScript() { return true; }
 
     static convertAsWin(): Constructor<BaseComponent> {
         return this._convertClazz('win');

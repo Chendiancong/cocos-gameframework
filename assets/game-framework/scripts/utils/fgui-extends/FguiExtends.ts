@@ -234,6 +234,8 @@ applyMixins(GLoader, [GLoaderExtends]);
 class UIPackageExtends implements FguiExtends.UIPackageExtends {
     private _ref: number;
 
+    get refCount() { return this._ref ?? 0; }
+
     addRef() {
         const curRef = this._ref ?? 0;
         this._ref = curRef + 1;

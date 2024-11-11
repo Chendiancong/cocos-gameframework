@@ -135,7 +135,7 @@ export function fanim<T extends ViewDef.ViewComp>(classPrototype: T, p: string) 
     fprop_helper({ anim: true }, classPrototype, p);
 }
 
-export function ftype<T extends ViewDef.ViewComp>(type: Constructor<T>) {
+export function ftype<T extends ViewDef.ViewComp>(type: ViewDef.ViewCompClazz<T>) {
     return fprop({ type });
 }
 
@@ -143,7 +143,7 @@ export function fvirtual<T extends ViewDef.ViewComp>(classPrototype: T, p: strin
     fprop_helper({ virtual: true }, classPrototype, p);
 }
 
-export function flistRenderer<T extends ViewDef.ViewComp>(type: Constructor<T>) {
+export function flistRenderer<T extends ViewDef.ViewComp>(type: ViewDef.ViewCompClazz<T>) {
     return fprop({ list: { itemRenderer: type } })
 }
 
@@ -172,8 +172,8 @@ export function fpresstip(params: { [x: string]: any }) {
     /// return fprop({ type: LongPressTips, params });
 }
 
-export function fcomp<T extends ViewDef.ViewComp>(comp: ViewDef.ViewCompType): (clazzProto: T, propName: string) => any;
-export function fcomp<T extends ViewDef.ViewComp>(comp: ViewDef.ViewCompType, params: { [x: string]: any }): (clazzProto: T, propName: string) => any;
+export function fcomp<T extends ViewDef.ViewComp>(comp: ViewDef.ViewCompClazz): (clazzProto: T, propName: string) => any;
+export function fcomp<T extends ViewDef.ViewComp>(comp: ViewDef.ViewCompClazz, params: { [x: string]: any }): (clazzProto: T, propName: string) => any;
 export function fcomp() {
     const comp = arguments[0];
     if (arguments.length === 1)

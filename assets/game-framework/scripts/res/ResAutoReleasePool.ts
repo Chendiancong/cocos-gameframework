@@ -1,15 +1,12 @@
-import { Asset } from "cc";
-import { fgui } from "../base/base";
-
 export class ResAutoReleasePool {
 
-    private _assetMap: { [url: string]: Asset | fgui.UIPackage } = Object.create(null);
+    private _assetMap: { [url: string]: gFramework.IRefCountable } = Object.create(null);
 
     get assetMap() {
         return this._assetMap;
     }
 
-    add(asset: Asset | fgui.UIPackage, url: string) {
+    add(asset: gFramework.IRefCountable, url: string) {
         let map = this._assetMap;
         if (!map[url]) {
             asset.addRef();
@@ -17,7 +14,7 @@ export class ResAutoReleasePool {
         }
     }
 
-    tryRelease(asset: Asset | fgui.UIPackage, url: string) {
+    tryRelease(asset: gFramework.IRefCountable, url: string) {
         if (asset.refCount <= 1) {
             asset.decRef();
             this._assetMap[url] = null;

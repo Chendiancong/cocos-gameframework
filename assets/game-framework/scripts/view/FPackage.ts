@@ -105,7 +105,7 @@ export class FPackage extends Component {
             return;
         }
         this._loadState = LoadState.Loading;
-        gFramework.resMgr.loadFPkg(
+        gFramework.resMgr.legacy_loadFPkg(
             this.packageName,
             (err, pkg) => this._onPackageLoaded(pkg)
         );

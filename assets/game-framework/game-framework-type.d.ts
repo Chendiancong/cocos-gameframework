@@ -226,6 +226,13 @@ declare namespace gFramework {
         onRelogin?(success: Function, failure: Function);
         onReconnect?(success: Function, failure: Function);
     }
+
+    interface IRefCountable {
+        readonly refCount: number;
+
+        addRef(): IRefCountable;
+        decRef(): IRefCountable;
+    }
 }
 
 /** 小游戏的api定义 */

@@ -3,6 +3,7 @@ import { fgui } from "../base/base";
 import { BaseComponent } from "./BaseComponent";
 import { CommonWin } from "./CommonWin";
 import type { ViewCtrl } from "./ViewCtrl";
+import { ViewCompType } from "./view-define";
 
 const { ccclass } = _decorator;
 
@@ -48,6 +49,7 @@ export class BaseWin extends BaseComponent implements IBaseWin {
         return this.node && this.node["$gobj"];
     }
 
+
     setWinTitle(title: string) {
         this.getComponent(CommonWin).winTitle.text = title;
     }
@@ -57,6 +59,10 @@ export class BaseWin extends BaseComponent implements IBaseWin {
     }
 
     delayOnLoad?: () => void;
+
+    static get compType() { return ViewCompType.BaseWin; }
+
+    static get isScript() { return true; }
 
     static convertAsWin() {
         return this;

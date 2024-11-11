@@ -27,3 +27,10 @@ export enum kUiParam {
     Collect,
 }
 gameEnum(kUiParam, "kUiParam");
+
+export enum ViewCompType {
+    BaseComponent,
+    BaseWin,
+    FScript,
+    FScriptWin,
+}

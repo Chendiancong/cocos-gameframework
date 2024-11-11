@@ -7,6 +7,9 @@ import { IBaseWin } from "./BaseWin";
 import { addTask } from "./TaskMgr";
 import { DEBUG } from "cc/env";
 import { ViewBetween } from "./ViewBetween";
+import { UIPackage } from "fairygui-cc";
+import { debugUtil } from "../base/debugUtil";
+import { IFPkgAsset } from "../res/ResMgr";
 
 const { ccclass } = _decorator;
 const enum kViewState {
@@ -76,7 +79,7 @@ export class ViewCtrl extends Component {
     private _show: boolean = true;
     private _viewPos: Vec2;
     private _state: kViewState = kViewState.UnLoad;
-    private _pkg: fgui.UIPackage = null;
+    private _pkg: IFPkgAsset;
     private _tween: Tween<ViewCtrl>;
     private _alphaEffect: number;
     get aview() {
@@ -265,25 +268,29 @@ export class ViewCtrl extends Component {
             if (!this.info.packName) {
                 this._onFguiLoaded();
             } else {
-                gFramework.resMgr.loadFPkg(this.info.packName, (err, pkg) => {
-                    if (err) {
-                        error(err);
-                        ViewBetween.ins.hideLoading();
-                        return;
-                    }
+                gFramework.resMgr.loadFPkg(
+                    this.info.packName,
+                    (err, asset) => {
+                        if (err) {
+                            debugUtil.error(err);
+                            ViewBetween.ins.hideLoading();
+                            return;
+                        }
 
-                    if (!this.isValid) {
-                        ViewBetween.ins.hideLoading();
-                        return;
-                    }
+                        if (!this.isValid) {
+                            ViewBetween.ins.hideLoading();
+                            return;
+                        }
 
-                    if (this.isClose()) {
-                        ViewBetween.ins.hideLoading();
-                        return;
+                        if (this.isClose()) {
+                            ViewBetween.ins.hideLoading();
+                            return;
+                        }
+
+                        this._pkg = asset = asset.addRef();
+                        this._onFguiLoaded();
                     }
-                    this._pkg = pkg = pkg.addRef();
-                    this._onFguiLoaded();
-                });
+                )
             }
 
         } while (false);

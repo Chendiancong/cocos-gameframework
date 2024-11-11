@@ -11,6 +11,7 @@ import { ResKeeper } from '../res/ResKeeper';
 import { FPropHandleContext, fpropUtil } from './FPropUtil';
 import { GComponent, GList, GLoader, GObject, UIPackage } from "fairygui-cc";
 import { getGlobal } from "../base/base";
+import { ViewCompType } from "./view-define";
 
 const { ccclass } = _decorator;
 
@@ -73,7 +74,11 @@ export class BaseComponent<T = any> extends Component implements ViewDef.ViewCom
         return this.observeWhenEnable;
     }
 
-    get clazz() { return this.constructor as Constructor<BaseComponent<T>>; }
+    get clazz() { return this.constructor as ViewDef.ViewCompClazz<BaseComponent<T>>; }
+
+    static get compType() { return ViewCompType.BaseComponent; }
+
+    static get isScript() { return false; }
 
     static convertAsWin(): Constructor<BaseComponent> {
         throw new Error();

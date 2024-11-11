@@ -194,31 +194,31 @@ export class FPropUtil {
         } while (false);
     }
 
-    setCCRenderer(gobj: GObject, type: ViewDef.ViewCompType) {
+    setCCRenderer(gobj: GObject, type: ViewDef.ViewCompClazz) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         gobj.ccRenderClazz = _type;
     }
 
-    addRenderer(gobj: GObject, type: ViewDef.ViewCompType, params?: any) {
+    addRenderer(gobj: GObject, type: ViewDef.ViewCompClazz, params?: any) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         gobj.addRenderer(_type, params);
     }
 
-    addContentRenderer(gobj: GLoader, type: ViewDef.ViewCompType, params?: any) {
+    addContentRenderer(gobj: GLoader, type: ViewDef.ViewCompClazz, params?: any) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         gobj.addContentRenderClazz(_type);
     }
 
-    addAsyncComponentRenderer(gobj: GComponent, type: ViewDef.ViewCompType, params?: any) {
+    addAsyncComponentRenderer(gobj: GComponent, type: ViewDef.ViewCompClazz, params?: any) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         gobj.addAsyncComponentRenderer(_type, params);
     }
 
-    setItemRenderer(glist: GList, type: ViewDef.ViewCompType) {
+    setItemRenderer(glist: GList, type: ViewDef.ViewCompClazz) {
         const _type = type.convertAsComponent();
         debugUtil.assert(!!_type);
         glist.ccItemRenderClazz = _type;

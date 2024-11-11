@@ -22,7 +22,7 @@ declare enum kUiParam {
 declare interface IViewRegisterInfo {
     id?: number;
     /** 类型 */
-    clazz?: ViewDef.ViewCompType,
+    clazz?: ViewDef.ViewCompClazz,
     /** 层级 */
     layer?: import("../LayerMgr").UILayer;
     /** 包名 */
@@ -64,19 +64,19 @@ declare interface IFProp {
     /** FGUI元件路径*/
     path?: string;
     /** 属性类型*/
-    type?: ViewDef.ViewCompType;
+    type?: ViewDef.ViewCompClazz;
     /** 子组件*/
-    comp?: { comp: Constructor<ViewDef.ViewComp>, params?: { [x: string]: any }, loader?: boolean }[];
+    comp?: { comp: ViewDef.ViewCompClazz<ViewDef.ViewComp>, params?: { [x: string]: any }, loader?: boolean }[];
     /** 列表 */
     list?: {
         /** 虚列表 */
         virtual?: boolean;
         /** 列表项组件 */
-        itemRenderer?: Constructor<ViewDef.ViewComp>;
+        itemRenderer?: ViewDef.ViewCompClazz<ViewDef.ViewComp>;
     },
     /** 装载器*/
     loader?: {
-        type: Constructor<ViewDef.ViewComp>,
+        type: ViewDef.ViewCompClazz<ViewDef.ViewComp>,
         packageName?: string,
         itemName?: string
     }
@@ -106,7 +106,7 @@ declare namespace ViewDef {
         readonly propsInited: boolean;
         readonly observeWhenEnable: boolean;
         readonly isValid: boolean;
-        readonly clazz: ViewCompType<ViewComp<Data>>
+        readonly clazz: ViewCompClazz<ViewComp<Data>>
 
         get data(): Data
         set data(d: Data);
@@ -130,10 +130,12 @@ declare namespace ViewDef {
         initProp(): void;
     }
 
-    type ViewCompTypeConverter = {
-        convertAsWin?(): Constructor<import('../BaseComponent').BaseComponent>;
-        convertAsComponent?(): Constructor<import('../BaseComponent').BaseComponent>;
+    type ViewCompClazzUtil = {
+        readonly compType: import('../view-define').ViewCompType;
+        readonly isScript: boolean;
+        convertAsWin(): Constructor<import('../BaseComponent').BaseComponent>;
+        convertAsComponent(): Constructor<import('../BaseComponent').BaseComponent>;
     }
 
-    type ViewCompType<T extends ViewComp = ViewComp> = Constructor<T> & ViewCompTypeConverter;
+    type ViewCompClazz<T extends ViewComp = ViewComp> = Constructor<T> & ViewCompClazzUtil;
 }
