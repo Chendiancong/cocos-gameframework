@@ -117,8 +117,8 @@ export class ResMgr {
 
         let resArgs = new LoadResArgs();
         resArgs
-            .set('type', type)
             .set('url', url)
+            .set('type', type)
             .set('bundle', bundle)
             .set('onProgress', progressCallback)
             .set('onCompleted', completeCallback);
@@ -131,6 +131,7 @@ export class ResMgr {
             }
             if (!!error) {
                 console.error(`load res error, ${url}`);
+                console.error(error);
                 const times = (this._errorTimes[url] ?? 0) + 1;
                 if (times >= 3) {
                     delete this._errorTimes[url];
@@ -151,7 +152,6 @@ export class ResMgr {
 
     loadResDir(
         url: string,
-        type?: typeof Asset,
         bundle?: AssetManager.Bundle,
         progressCallback?: LoadProgressCallback,
         completeCallback?: LoadCompleteCallback<Asset>
@@ -159,7 +159,6 @@ export class ResMgr {
         const resArgs = new LoadResArgs();
         resArgs
             .set('url', url)
-            .set('type', type)
             .set('bundle', bundle ?? this._defaultBundle)
             .set('onProgress', progressCallback)
             .set('onCompleted', completeCallback);
@@ -183,7 +182,6 @@ export class ResMgr {
 
     loadResArray(
         urls: string[],
-        type?: typeof Asset,
         bundle?: AssetManager.Bundle,
         progressCallback?: LoadProgressCallback,
         completeCallback?: LoadCompleteCallback<Asset>
@@ -191,7 +189,6 @@ export class ResMgr {
         const resArgs = new LoadResArgs();
         resArgs
             .set('urls', urls)
-            .set('type', type)
             .set('bundle', bundle ?? this._defaultBundle)
             .set('onProgress', progressCallback)
             .set('onCompleted', completeCallback);
@@ -213,9 +210,68 @@ export class ResMgr {
         );
     }
 
-    aloadRes: <T extends Asset = Asset>(url: string, type?: Constructor<T>, bundle?: AssetManager.Bundle, onProgress?: LoadProgressCallback, onFinish?: LoadCompleteCallback<Asset>) => Promise<T> = promisify(this.loadRes.bind(this));
-    aloadResDir: <T extends Asset = Asset>(url: string, type?: Constructor<T>, bundle?: AssetManager.Bundle, onProgress?: LoadProgressCallback) => Promise<T[]> = promisify(this.loadResDir.bind(this));
-    aloadResArray: <T extends Asset>(urls: string[], type?: Constructor<T>, bundle?: AssetManager.Bundle, onProgess?: LoadProgressCallback) => Promise<T[]> = promisify(this.loadResArray.bind(this));
+    aloadRes<T extends Asset = Asset>(
+        url: string,
+        type?: Constructor<T>,
+        bundle?: AssetManager.Bundle,
+        onProgress?: LoadProgressCallback,
+        onFinish?: LoadCompleteCallback<T>
+    ): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            this.loadRes(
+                url, type, bundle,
+                onProgress,
+                function (error: Error, asset?: T) {
+                    onFinish && onFinish(error, asset);
+                    if (error)
+                        reject(error);
+                    else
+                        resolve(asset);
+                }
+            )
+        });
+    }
+
+    aloadResDir(
+        url: string,
+        bundle?: AssetManager.Bundle,
+        onProgress?: LoadProgressCallback,
+        onFinish?: LoadCompleteCallback<Asset>
+    ) {
+        return new Promise<Asset[]>((resolve, reject) => {
+            this.loadResDir(
+                url, bundle, onProgress,
+                function (error: Error, asset?: Asset[]) {
+                    onFinish && onFinish(error, asset);
+                    if (error)
+                        reject(error);
+                    else
+                        resolve(asset);
+                }
+            )
+        });
+    }
+
+    aloadResArray(
+        urls: string[],
+        bundle?: AssetManager.Bundle,
+        onProgress?: LoadProgressCallback,
+        onFinish?: LoadCompleteCallback<Asset>
+    ) {
+        return new Promise<Asset[]>((resolve, reject) => {
+            this.loadResArray(
+                urls, bundle,
+                onProgress,
+                function (error: Error, asset?: Asset[]) {
+                    onFinish && onFinish(error, asset);
+                    if (error)
+                        reject(error);
+                    else
+                        resolve(asset);
+                }
+            )
+        });
+    }
 
     private _finishItem(asset: Asset | fgui.UIPackage, url: string) {
         // this.autoReleasePool.add(asset, url);
@@ -325,7 +381,19 @@ export class ResMgr {
         }
     }
 
-    aloadFPkg: (name: string) => Promise<IFPkgAsset> = promisify(this.loadFPkg.bind(this));
+    aloadFPkg(name: string) {
+        return new Promise<IFPkgAsset>((resolve, reject) => {
+            this.loadFPkg(
+                name,
+                function (error: Error, asset: IFPkgAsset) {
+                    if (error)
+                        reject(error);
+                    else
+                        resolve(asset);
+                }
+            )
+        });
+    }
 
     loadUuid<T extends Asset>(uuid: string): Promise<T> {
         return ResMgr.loadUuid<T>(uuid);

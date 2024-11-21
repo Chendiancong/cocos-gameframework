@@ -1,4 +1,4 @@
-import { _decorator, Component } from 'cc';
+import { _decorator, Asset, assetManager, Component, SpriteFrame } from 'cc';
 import { GameInstance } from './GameInstance';
 import { initGameFramework } from 'game-framework/scripts/framework-initial';
 import { getGlobal } from 'game-framework/scripts/base/base';
@@ -30,5 +30,24 @@ export class StartGame extends Component {
 
     closeMainUI2() {
         gFramework.viewMgr.close(MainUI2);
+    }
+
+
+    private _asset: Asset;
+    async testLoadRes() {
+        this._asset = await gFramework.resMgr.aloadRes<SpriteFrame>('fgui/main_atlas0/spriteFrame');
+        gFramework.log('asset loaded', this._asset);
+    }
+
+    testReleaseRes() {
+        if (this._asset?.isValid) {
+            const toRelease = this._asset;
+            delete this._asset;
+            assetManager.releaseAsset(toRelease);
+        }
+    }
+
+    testParams(a: number, b?: number, c: number = 1) {
+        console.log(a, b, c);
     }
 }

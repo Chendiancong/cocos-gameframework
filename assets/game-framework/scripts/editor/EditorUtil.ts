@@ -1,7 +1,8 @@
-import { EDITOR } from "cc/env"
 import { aspects } from "../utils/Aspects"
 
 const { checkEditor } = aspects;
+
+var Editor;
 
 export type AssetInfo = {
     displayName: string,
@@ -100,7 +101,7 @@ function createAsset(url: string, content: string|null, option?: { overwrite?: b
  * @param urlOrUuid uuid or db://assets/....
  * @param content content {string | Buffer} The content string of the resource. For typeArray, use the "buffer.from" transform.
  */
-function saveAsset(urlOrUuid: string, content: string|Buffer): Promise<void> {
+function saveAsset(urlOrUuid: string, content: string|ArrayBuffer): Promise<void> {
     checkEditor(true);
     return Editor.Message.request("asset-db", "save-asset", urlOrUuid, content);
 }
@@ -126,7 +127,9 @@ async function createOrSaveAsset(url: string, content: string): Promise<void> {
 async function createFile(url: string, content: string|DataView|Uint8Array) {
     checkEditor(true);
     // 编辑器模式下，使用node环境
+    // @ts-ignore
     const fs = require('fs');
+    // @ts-ignore
     const path = require('path');
     const filePath = path.join(Editor.Project.path, url.replace(/^db:\/\//, ''));
     if (!fs.existsSync(path.dirname(filePath)))
